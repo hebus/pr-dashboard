@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PR Dashboard — Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-subtle: #161b22;
+      --bg-card: #1c2128;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --amber: #d29922;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --sidebar-w: 260px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    nav {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--bg-subtle);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      overflow-y: auto;
+      padding: 24px 0;
+      z-index: 10;
+    }
+    nav .logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    nav .logo svg { flex-shrink: 0; }
+    nav .logo span { font-weight: 700; font-size: 15px; color: var(--text); }
+    nav .logo small { display: block; font-size: 11px; color: var(--text-muted); font-weight: 400; }
+    nav a {
+      display: block;
+      padding: 6px 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+    nav a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    nav a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(88,166,255,0.08); }
+    nav .section-title {
+      padding: 12px 20px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    /* ── Main content ── */
+    main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      max-width: 900px;
+      padding: 48px 48px 96px;
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 22px; font-weight: 700; color: var(--text); margin: 56px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    h3 { font-size: 16px; font-weight: 600; color: var(--text); margin: 28px 0 10px; }
+    p { color: var(--text-muted); margin-bottom: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: #ff7b72;
+    }
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+    pre code {
+      background: none; border: none; padding: 0; color: #e6edf3; font-size: 13px;
+    }
+    .lead { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; max-width: 680px; }
+
+    /* ── Hero ── */
+    .hero {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 8px;
+    }
+    .hero-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, #238636, #58a6ff);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .badge-blue  { background: rgba(88,166,255,.12); color: var(--accent); border-color: rgba(88,166,255,.3); }
+    .badge-green { background: rgba(63,185,80,.12); color: var(--green); border-color: rgba(63,185,80,.3); }
+    .badge-amber { background: rgba(210,153,34,.12); color: var(--amber); border-color: rgba(210,153,34,.3); }
+    .badge-purple{ background: rgba(188,140,255,.12); color: var(--purple); border-color: rgba(188,140,255,.3); }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; margin-top: 12px; }
+
+    /* ── Tech stack grid ── */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .stack-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.15s;
+    }
+    .stack-card:hover { border-color: var(--accent); }
+    .stack-card .icon { font-size: 22px; margin-bottom: 8px; }
+    .stack-card .name { font-weight: 600; font-size: 14px; color: var(--text); }
+    .stack-card .role { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .stack-card .tech { font-size: 11px; color: var(--accent); margin-top: 6px; font-family: monospace; }
+
+    /* ── File tree ── */
+    .file-tree {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.9;
+    }
+    .ft-dir  { color: var(--accent); }
+    .ft-file { color: var(--text); }
+    .ft-note { color: var(--text-muted); font-style: italic; font-size: 11px; margin-left: 8px; }
+    .ft-indent { padding-left: 20px; }
+
+    /* ── Mermaid diagrams ── */
+    .diagram-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin: 20px 0;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .diagram-wrap .mermaid { display: inline-block; }
+
+    /* ── Tables ── */
+    table {
+      width: 100%; border-collapse: collapse; margin: 16px 0;
+      font-size: 13.5px;
+    }
+    th {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      color: var(--text-muted);
+    }
+    td:first-child { color: var(--text); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .table-wrap {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+
+    /* ── Color swatches ── */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .color-swatch {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .swatch-preview {
+      height: 44px;
+    }
+    .swatch-info {
+      padding: 8px 10px;
+      background: var(--bg-card);
+    }
+    .swatch-name { font-size: 12px; font-weight: 600; color: var(--text); }
+    .swatch-values { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+
+    /* ── Callout ── */
+    .callout {
+      border-left: 3px solid;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+    .callout-blue  { border-color: var(--accent); background: rgba(88,166,255,.08); }
+    .callout-amber { border-color: var(--amber); background: rgba(210,153,34,.08); }
+    .callout-green { border-color: var(--green); background: rgba(63,185,80,.08); }
+    .callout strong { color: var(--text); }
+    .callout p { margin-bottom: 0; }
+
+    /* ── Commands ── */
+    .cmd-block {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--green);
+      margin: 12px 0;
+    }
+    .cmd-block .comment { color: var(--text-muted); }
+
+    /* ── Section anchor offset for fixed header ── */
+    section { scroll-margin-top: 24px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SIDEBAR -->
+<nav>
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+      <path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>
+    </svg>
+    <span>PR Dashboard<small>Architecture Guide</small></span>
+  </div>
+
+  <div class="section-title">Overview</div>
+  <a href="#overview">Vue d'ensemble</a>
+  <a href="#stack">Stack technique</a>
+  <a href="#structure">Structure des fichiers</a>
+
+  <div class="section-title">Fonctionnement</div>
+  <a href="#dataflow">Flux de données</a>
+  <a href="#api">GitHub API</a>
+  <a href="#types">Types de données</a>
+  <a href="#loading">Chargement initial</a>
+
+  <div class="section-title">Fonctionnalités</div>
+  <a href="#notifications">Notifications</a>
+  <a href="#tray">System Tray</a>
+  <a href="#theming">Theming</a>
+
+  <div class="section-title">Intégration</div>
+  <a href="#ipc">Frontend ↔ Backend</a>
+  <a href="#polling">Polling & Performance</a>
+  <a href="#run">Lancer l'application</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN -->
+<main>
+
+  <!-- HERO -->
+  <section id="overview">
+    <div class="hero">
+      <div class="hero-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+          <path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>
+        </svg>
+      </div>
+      <h1>PR Dashboard</h1>
+    </div>
+    <div class="badges">
+      <span class="badge badge-blue">Tauri 2</span>
+      <span class="badge badge-blue">React 19</span>
+      <span class="badge badge-green">TypeScript</span>
+      <span class="badge badge-amber">Rust</span>
+      <span class="badge badge-purple">GitHub Enterprise</span>
+    </div>
+    <p class="lead">
+      Application desktop qui affiche en temps réel les Pull Requests ouvertes sur plusieurs repositories GitHub Enterprise. Elle tourne dans le system tray, envoie des notifications desktop, et ne nécessite aucun navigateur.
+    </p>
+
+    <h3>Comment ça marche en une phrase</h3>
+    <p>Le <strong style="color:var(--text)">frontend React</strong> interroge le <strong style="color:var(--text)">backend Rust</strong> via des commandes Tauri. Le Rust fait les appels HTTP vers <strong style="color:var(--text)">l'API GraphQL GitHub</strong> et renvoie les PRs. React Query gère le cache et le re-polling automatique.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+graph LR
+    A[👤 Utilisateur] -->|interagit| B[React UI]
+    B -->|invoke| C[Rust / Tauri]
+    C -->|GraphQL| D[(GitHub API)]
+    D -->|PRs JSON| C
+    C -->|RepoPRs| B
+    B -->|affiche| E[PR Cards]
+    C -->|notifications| F[🔔 OS]
+    style A fill:#1c2128,stroke:#30363d,color:#e6edf3
+    style B fill:#1d4ed8,stroke:#3b82f6,color:#fff
+    style C fill:#b45309,stroke:#d97706,color:#fff
+    style D fill:#1a7f37,stroke:#3fb950,color:#fff
+    style E fill:#1c2128,stroke:#30363d,color:#e6edf3
+    style F fill:#6d28d9,stroke:#8b5cf6,color:#fff
+      </div>
+    </div>
+  </section>
+
+  <!-- STACK -->
+  <section id="stack">
+    <h2>Stack technique</h2>
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="icon">⚛️</div>
+        <div class="name">Frontend</div>
+        <div class="role">UI, état local, polling</div>
+        <div class="tech">React 19 + TypeScript</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">⚡</div>
+        <div class="name">Build</div>
+        <div class="role">Dev server (port 1420), bundling</div>
+        <div class="tech">Vite 7</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🎨</div>
+        <div class="name">Styles</div>
+        <div class="role">Utility-first, theming light/dark</div>
+        <div class="tech">Tailwind CSS 4 + CSS vars</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🔄</div>
+        <div class="name">Async / Cache</div>
+        <div class="role">Fetching, polling, invalidation</div>
+        <div class="tech">TanStack React Query 5</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🦀</div>
+        <div class="name">Shell desktop</div>
+        <div class="role">Fenêtre native, tray, commandes IPC</div>
+        <div class="tech">Tauri 2 (Rust)</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🌐</div>
+        <div class="name">HTTP Rust</div>
+        <div class="role">Appels GitHub API (async)</div>
+        <div class="tech">reqwest 0.12 + tokio</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">💾</div>
+        <div class="name">Persistance</div>
+        <div class="role">Config JSON dans AppData</div>
+        <div class="tech">tauri-plugin-store</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🔔</div>
+        <div class="name">Notifications</div>
+        <div class="role">Notifications OS natives</div>
+        <div class="tech">tauri-plugin-notification</div>
+      </div>
+      <div class="stack-card">
+        <div class="icon">🔗</div>
+        <div class="name">Liens externes</div>
+        <div class="role">Ouvre GitHub dans le navigateur</div>
+        <div class="tech">tauri-plugin-opener</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRUCTURE -->
+  <section id="structure">
+    <h2>Structure des fichiers</h2>
+    <div class="file-tree">
+      <span class="ft-dir">pr-dashboard/</span><br>
+      <div class="ft-indent">
+        <span class="ft-dir">src/</span><span class="ft-note">Frontend React/TypeScript</span><br>
+        <div class="ft-indent">
+          <span class="ft-dir">types/</span><br>
+          <div class="ft-indent">
+            <span class="ft-file">index.ts</span><span class="ft-note">Tous les types + helpers (timeAgo, matchesFilter…)</span><br>
+          </div>
+          <span class="ft-dir">hooks/</span><br>
+          <div class="ft-indent">
+            <span class="ft-file">useConfig.ts</span><span class="ft-note">Chargement/sauvegarde config via Tauri</span><br>
+            <span class="ft-file">usePRData.ts</span><span class="ft-note">Polling GitHub + émission d'événements PREvent</span><br>
+            <span class="ft-file">useToast.ts</span><span class="ft-note">Queue de toasts, auto-dismiss 5s</span><br>
+            <span class="ft-file">useNotifications.ts</span><span class="ft-note">Historique persistant (markRead, remove…)</span><br>
+          </div>
+          <span class="ft-dir">components/</span><br>
+          <div class="ft-indent">
+            <span class="ft-file">PRCard.tsx</span><span class="ft-note">Carte d'une Pull Request</span><br>
+            <span class="ft-file">RepoGroup.tsx</span><span class="ft-note">Groupe collapsible par repository</span><br>
+            <span class="ft-file">FilterBar.tsx</span><span class="ft-note">Recherche + toggle All / Pending / Approved</span><br>
+            <span class="ft-file">NotificationPanel.tsx</span><span class="ft-note">Dropdown historique (icône cloche)</span><br>
+            <span class="ft-file">ToastContainer.tsx</span><span class="ft-note">Toasts in-app (slide-in, barre progression)</span><br>
+            <span class="ft-file">Settings.tsx</span><span class="ft-note">Modal config (token, repos, intervalle…)</span><br>
+            <span class="ft-file">ErrorBoundary.tsx</span><span class="ft-note">Capture les erreurs React</span><br>
+          </div>
+          <span class="ft-file">App.tsx</span><span class="ft-note">Racine : layout, état global, toggle thème, events PR</span><br>
+          <span class="ft-file">main.tsx</span><span class="ft-note">Bootstrap React + QueryClient</span><br>
+          <span class="ft-file">index.css</span><span class="ft-note">Tailwind, variables CSS, scrollbar, @keyframes</span><br>
+        </div>
+        <span class="ft-dir">src-tauri/</span><span class="ft-note">Backend Rust</span><br>
+        <div class="ft-indent">
+          <span class="ft-dir">src/</span><br>
+          <div class="ft-indent">
+            <span class="ft-file">lib.rs</span><span class="ft-note">Init Tauri : plugins, tray, handlers, AUMID, tooltip</span><br>
+            <span class="ft-file">main.rs</span><span class="ft-note">Point d'entrée (délègue à lib.rs)</span><br>
+            <span class="ft-dir">commands/</span><br>
+            <div class="ft-indent">
+              <span class="ft-file">config.rs</span><span class="ft-note">get_config / save_config</span><br>
+              <span class="ft-file">fetch_prs.rs</span><span class="ft-note">fetch_repo_prs / check_pr_merged / open_url</span><br>
+            </div>
+          </div>
+          <span class="ft-dir">capabilities/</span><br>
+          <div class="ft-indent">
+            <span class="ft-file">default.json</span><span class="ft-note">Permissions Tauri (tray, store, notification, opener)</span><br>
+          </div>
+          <span class="ft-file">Cargo.toml</span><span class="ft-note">Dépendances Rust</span><br>
+          <span class="ft-file">tauri.conf.json</span><span class="ft-note">Config Tauri (nom, fenêtre, bundle)</span><br>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA FLOW -->
+  <section id="dataflow">
+    <h2>Flux de données principal</h2>
+    <p>Voici comment les données circulent du stockage jusqu'à l'affichage, et comment les événements PR déclenchent les notifications.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    LS[(localStorage\nthème)] --> APP
+    STORE[("config.json\n%APPDATA%")] -->|get_config| APP
+
+    APP[App.tsx] -->|useConfig| STORE
+    APP -->|usePRData| Q
+
+    subgraph Q["React Query — une query par repo"]
+        direction TB
+        RQ[useQueries] -->|invoke fetch_repo_prs\nevery N seconds| RUST
+        RUST["🦀 Rust\nfetch_repo_prs"] -->|GraphQL POST| GH[(GitHub\nAPI)]
+        GH -->|nodes JSON| RUST
+        RUST -->|RepoPRs| RQ
+    end
+
+    Q -->|prs| RG[RepoGroup]
+    RG --> PC[PRCard ×N]
+
+    Q -->|événements détectés| EV{PREvent}
+    EV -->|fenêtre visible| TOAST[ToastContainer]
+    EV -->|fenêtre cachée| TRAY[🖥️ Tray tooltip\n+N events]
+    EV -->|toujours| NOTIF[NotificationPanel\nhistorique]
+
+    style APP fill:#1d4ed8,stroke:#3b82f6,color:#fff
+    style RUST fill:#92400e,stroke:#d97706,color:#fff
+    style GH fill:#166534,stroke:#3fb950,color:#fff
+    style STORE fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
+    style LS fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
+      </div>
+    </div>
+
+    <div class="callout callout-blue">
+      <p><strong>React Query</strong> gère automatiquement le cache et le re-fetch. Chaque repository a sa propre query (clé <code>["prs", owner, name]</code>), ce qui permet des rafraîchissements indépendants et un affichage partiel si un repo est lent.</p>
+    </div>
+  </section>
+
+  <!-- API -->
+  <section id="api">
+    <h2>GitHub API</h2>
+    <p>L'application supporte <strong style="color:var(--text)">GitHub Enterprise Server (GHES)</strong>. L'URL de base est configurable. Tous les endpoints en sont dérivés automatiquement.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>URL construite</th></tr></thead>
+        <tbody>
+          <tr><td>GraphQL</td><td><code>{githubUrl}/api/graphql</code></td></tr>
+          <tr><td>REST</td><td><code>{githubUrl}/api/v3/repos/{owner}/{repo}/pulls/{number}</code></td></tr>
+          <tr><td>Web</td><td><code>{githubUrl}/{owner}/{repo}/pulls</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>GraphQL — <code>fetch_repo_prs</code></h3>
+    <p>Un seul appel par repository pour récupérer les 50 PRs ouvertes les plus récentes :</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    participant R as 🦀 Rust
+    participant G as GitHub GraphQL
+
+    R->>G: POST /api/graphql<br/>Authorization: Bearer token
+    Note over R,G: query GetOpenPRs($owner, $repo, first: 50)
+    G-->>R: pullRequests nodes[]<br/>(number, title, url, isDraft,<br/>reviewDecision, author, labels, reviews)
+    R->>R: map nodes → PullRequest[]<br/>extraire approvers depuis reviews
+    R-->>R: RepoPRs { repo, prs, lastUpdated }
+      </div>
+    </div>
+
+    <div class="callout callout-amber">
+      <p><strong>Note GHES :</strong> Le champ <code>requestedReviewers</code> n'est pas disponible sur toutes les versions de GitHub Enterprise Server — il a été retiré de la query pour éviter une erreur GraphQL bloquante.</p>
+    </div>
+
+    <h3>REST — <code>check_pr_merged</code></h3>
+    <p>Appelé uniquement quand une PR disparaît de la liste ouverte, pour distinguer une <em>fermeture</em> d'un <em>merge</em> :</p>
+
+    <pre><code>GET {githubUrl}/api/v3/repos/{owner}/{repo}/pulls/{number}
+→ { state: "closed", merged_at: "2024-..." }
+  merged si merged_at ≠ null</code></pre>
+  </section>
+
+  <!-- TYPES -->
+  <section id="types">
+    <h2>Types de données</h2>
+
+    <pre><code>interface PullRequest {
+  number:             number;
+  title:              string;
+  url:                string;
+  isDraft:            boolean;
+  createdAt:          string;          // ISO 8601
+  updatedAt:          string;
+  headRefName:        string;          // branche source
+  baseRefName:        string;          // branche cible
+  reviewDecision:     ReviewDecision;
+  author:             Reviewer;
+  labels:             Label[];
+  requestedReviewers: Reviewer[];      // toujours vide (non supporté GHES)
+  approvers:          Reviewer[];      // extrait des reviews state === "APPROVED"
+}
+
+type ReviewDecision = "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+
+interface Reviewer {
+  login:     string;
+  avatarUrl: string;
+}
+
+interface RepoPRs {
+  repo:        string;       // "owner/name"
+  prs:         PullRequest[];
+  error:       string | null;
+  lastUpdated: string | null;  // horodatage UTC du dernier fetch
+}
+
+interface Config {
+  githubToken:     string;
+  githubUrl:       string;   // défaut: https://github.sinequa.com
+  refreshInterval: number;   // secondes, défaut: 60
+  repositories:    RepositoryConfig[];
+}
+
+interface PREvent {
+  type:     "new_pr" | "merged";
+  repo:     string;
+  prNumber: number;
+  prTitle:  string;
+  url:      string;
+}</code></pre>
+  </section>
+
+  <!-- LOADING -->
+  <section id="loading">
+    <h2>Chargement initial — squelettes</h2>
+    <p>Au premier lancement, avant que les données GitHub soient disponibles, <code>RepoGroup</code> affiche <strong style="color:var(--text)">3 cartes squelettes animées</strong> (<code>animate-pulse</code>) qui reproduisent la structure de <code>PRCard</code>.</p>
+
+    <div class="callout callout-green">
+      <p><strong>Condition :</strong> <code>isLoading && prs.length === 0</code> — les squelettes n'apparaissent qu'au premier fetch. Les refreshs en arrière-plan restent discrets : seul le spinner dans l'en-tête du groupe tourne.</p>
+    </div>
+  </section>
+
+  <!-- NOTIFICATIONS -->
+  <section id="notifications">
+    <h2>Système de notifications</h2>
+
+    <h3>Détection des changements de PR</h3>
+    <p>La détection repose sur un <code>useRef</code> qui conserve l'état précédent des PRs entre les renders :</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+flowchart TD
+    POLL[Nouveau poll terminé] --> COMP[Comparer avec ref précédent]
+
+    COMP -->|PR absente du ref| NEW["🟢 new_pr\nevent"]
+    COMP -->|PR disparue de la liste| CHECK["invoke check_pr_merged\nREST API"]
+    CHECK -->|merged_at non null| MRG["🟣 merged\nevent"]
+    CHECK -->|pas mergée| SIL[Silencieux\nfermée sans merge]
+
+    NEW --> EMIT[emit PREvent]
+    MRG --> EMIT
+    EMIT --> UPDATE["Mettre à jour le ref\navec l'état actuel"]
+
+    EMIT -->|fenêtre visible| TOAST[Toast in-app]
+    EMIT -->|fenêtre cachée| TRAY["Tray tooltip\n+N events"]
+    EMIT --> HIST[Historique notifications]
+
+    style NEW fill:#166534,stroke:#3fb950,color:#fff
+    style MRG fill:#4c1d95,stroke:#8b5cf6,color:#fff
+    style TOAST fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
+    style TRAY fill:#1c2128,stroke:#30363d,color:#e6edf3
+      </div>
+    </div>
+
+    <div class="callout callout-blue">
+      <p><strong>Premier démarrage :</strong> le <code>useRef</code> est vide, donc aucune notification ne tire lors du premier fetch. Les notifications démarrent à partir du second poll.</p>
+    </div>
+
+    <h3>Comportement fenêtre cachée (tray)</h3>
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    participant U as 👤 Utilisateur
+    participant W as Fenêtre (cachée)
+    participant T as 🖥️ Tray icon
+    participant R as 🦀 Rust
+
+    note over W: Fenêtre cachée dans le tray
+    W->>W: PR event détecté
+    W->>W: pendingRef.push(event)
+    W->>R: invoke set_tray_tooltip("PR Dashboard — 3 new events")
+    R->>T: tray.set_tooltip(...)
+
+    U->>T: Clic gauche sur l'icône
+    T->>W: window.show() + set_focus()
+    W->>W: tauri://focus déclenché
+    W->>W: pending.forEach(addToast)
+    W->>W: pendingRef = []
+    W->>R: invoke set_tray_tooltip("PR Dashboard")
+      </div>
+    </div>
+
+    <h3>Toasts in-app</h3>
+    <p>Chaque <code>ToastItem</code> : slide-in depuis la droite, barre de progression 5s, cliquable pour ouvrir la PR, bouton ✕ manuel.</p>
+
+    <h3>Enregistrement AUMID Windows</h3>
+    <p>Sur Windows, les Toast Notifications requièrent un enregistrement dans le registre :</p>
+    <pre><code>HKCU\SOFTWARE\Classes\AppUserModelId\com.sinequa.prdashboard
+  DisplayName = "PR Dashboard"</code></pre>
+    <div class="callout callout-amber">
+      <p>Cet enregistrement est <strong>idempotent</strong> et ne nécessite pas de droits admin (HKCU). Sans cette clé, <code>tauri-plugin-notification</code> échoue silencieusement et l'app n'apparaît pas dans Paramètres → Notifications.</p>
+    </div>
+  </section>
+
+  <!-- TRAY -->
+  <section id="tray">
+    <h2>System Tray</h2>
+    <p>Configuré dans <code>lib.rs</code> via <code>TrayIconBuilder</code>. La fermeture de la fenêtre via la croix ✕ est interceptée par <code>on_window_event</code> et redirigée vers un <code>window.hide()</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Action utilisateur</th><th>Comportement</th></tr></thead>
+        <tbody>
+          <tr><td>🖱️ Clic gauche sur l'icône tray</td><td>Toggle show/hide de la fenêtre principale</td></tr>
+          <tr><td>Menu → "Show Dashboard"</td><td>Affiche et focus la fenêtre</td></tr>
+          <tr><td>Menu → "Quit"</td><td>Quitte l'application (<code>app.exit(0)</code>)</td></tr>
+          <tr><td>⚡ Bouton Power dans le header</td><td>Quitte l'application (<code>invoke("quit_app")</code>)</td></tr>
+          <tr><td>Clic sur la croix ✕</td><td>Réduit au tray — ne quitte pas (<code>prevent_close()</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --> Visible : Démarrage
+    Visible --> Cachée : Clic ✕ (prevent_close)
+    Visible --> Cachée : Clic tray (si visible)
+    Cachée --> Visible : Clic tray (si cachée)
+    Cachée --> Visible : Menu "Show Dashboard"
+    Visible --> [*] : Menu "Quit" / bouton Power
+    Cachée --> [*] : Menu "Quit"
+      </div>
+    </div>
+  </section>
+
+  <!-- THEMING -->
+  <section id="theming">
+    <h2>Theming (light / dark)</h2>
+    <p>Les couleurs passent toutes par des <strong style="color:var(--text)">CSS custom properties</strong> définies dans <code>index.css</code>. Un seul changement de classe sur <code>&lt;html&gt;</code> bascule l'intégralité du thème.</p>
+
+    <pre><code>/* index.css */
+:root      { /* light */ --c-bg: #ffffff; --c-accent: #0969da; … }
+:root.dark { /* dark  */ --c-bg: #0d1117; --c-accent: #58a6ff; … }</code></pre>
+
+    <h3>Palette dark (défaut)</h3>
+    <div class="color-grid">
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#0d1117"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-bg</div><div class="swatch-values">#0d1117 · Fond principal</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#161b22"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-bg-subtle</div><div class="swatch-values">#161b22 · Header, cartes</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#1c2128"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-bg-card</div><div class="swatch-values">#1c2128 · Hover</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#30363d"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-border</div><div class="swatch-values">#30363d · Bordures</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#58a6ff"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-accent</div><div class="swatch-values">#58a6ff · Liens, focus</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#3fb950"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-green</div><div class="swatch-values">#3fb950 · Approved</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#d29922"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-amber</div><div class="swatch-values">#d29922 · Pending Review</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#f85149"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-red</div><div class="swatch-values">#f85149 · Changes Requested</div></div>
+      </div>
+    </div>
+
+    <p style="margin-top:16px">Le toggle Sun/Moon dans le header lit et écrit la préférence dans <code>localStorage</code> (<code>"theme"</code>). Au montage, <code>useEffect</code> applique ou retire la classe <code>.dark</code> sur <code>document.documentElement</code>.</p>
+  </section>
+
+  <!-- IPC -->
+  <section id="ipc">
+    <h2>Frontend ↔ Backend (IPC)</h2>
+    <p>Tauri expose un système de RPC via <code>invoke()</code> côté frontend. Les handlers Rust sont enregistrés dans <code>lib.rs</code> via <code>tauri::generate_handler!</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Commande</th><th>Paramètres clés</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>get_config</code></td><td>—</td><td>Lit la config depuis le store JSON</td></tr>
+          <tr><td><code>save_config</code></td><td><code>config</code></td><td>Persiste la config sur disque</td></tr>
+          <tr><td><code>fetch_repo_prs</code></td><td><code>owner, repo, token, githubUrl</code></td><td>Appel GraphQL → <code>RepoPRs</code></td></tr>
+          <tr><td><code>check_pr_merged</code></td><td><code>owner, repo, number, token, githubUrl</code></td><td>Appel REST → <code>bool</code></td></tr>
+          <tr><td><code>open_url</code></td><td><code>url</code></td><td>Ouvre une URL dans le navigateur système</td></tr>
+          <tr><td><code>set_tray_tooltip</code></td><td><code>tooltip</code></td><td>Met à jour le tooltip de l'icône tray</td></tr>
+          <tr><td><code>quit_app</code></td><td>—</td><td>Quitte l'application (<code>app.exit(0)</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <pre><code>// Côté frontend (TypeScript)
+import { invoke } from "@tauri-apps/api/core";
+
+const data = await invoke("fetch_repo_prs", {
+  owner: "sinequa",
+  repo:  "sba-internal",
+  token: config.githubToken,
+  githubUrl: config.githubUrl,
+});
+// → RepoPRs</code></pre>
+
+    <pre><code>// Côté backend (Rust)
+#[tauri::command]
+async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: String)
+  -> Result&lt;RepoPRs, String&gt; { … }</code></pre>
+  </section>
+
+  <!-- POLLING -->
+  <section id="polling">
+    <h2>Polling &amp; Performance</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Aspect</th><th>Comportement</th></tr></thead>
+        <tbody>
+          <tr><td>Cache</td><td>React Query maintient le dernier résultat affiché pendant le re-fetch</td></tr>
+          <tr><td>Indépendance</td><td>Chaque repo a sa propre query — un timeout n'affecte pas les autres</td></tr>
+          <tr><td>Refresh manuel</td><td>Bouton refresh → <code>queryClient.invalidateQueries(["prs"])</code></td></tr>
+          <tr><td>Désactivation</td><td>Queries désactivées (<code>enabled: false</code>) si token vide</td></tr>
+          <tr><td>Timeout HTTP</td><td>15 secondes côté Rust (reqwest)</td></tr>
+          <tr><td>Intervalle</td><td>Configurable dans Settings (défaut : 60s)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RUN -->
+  <section id="run">
+    <h2>Lancer l'application</h2>
+
+    <h3>Prérequis</h3>
+    <p>Node.js, Rust toolchain, WebView2 (Windows — déjà présent sur Windows 11).</p>
+
+    <div class="cmd-block">
+      <span class="comment"># Développement — hot-reload frontend, rebuild Rust si modifié</span><br>
+      npm run tauri dev
+    </div>
+
+    <div class="cmd-block">
+      <span class="comment"># Build de production</span><br>
+      npm run tauri build
+    </div>
+
+    <div class="callout callout-green">
+      <p>La config (token, repos) est stockée dans <code>%APPDATA%\com.sinequa.prdashboard\config.json</code>. Elle persiste entre les sessions et entre les builds.</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: {
+      background: "#1c2128",
+      primaryColor: "#1d4ed8",
+      primaryTextColor: "#e6edf3",
+      primaryBorderColor: "#30363d",
+      lineColor: "#58a6ff",
+      secondaryColor: "#21262d",
+      tertiaryColor: "#161b22",
+      edgeLabelBackground: "#1c2128",
+      fontSize: "14px",
+    },
+    flowchart: { curve: "basis", padding: 20 },
+    sequence: { diagramMarginX: 20, diagramMarginY: 20 },
+  });
+
+  // Active nav link on scroll
+  const sections = document.querySelectorAll("section[id]");
+  const links = document.querySelectorAll("nav a[href^='#']");
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove("active"));
+        const a = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (a) a.classList.add("active");
+      }
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
