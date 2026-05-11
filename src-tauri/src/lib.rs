@@ -13,6 +13,11 @@ fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) {
     }
 }
 
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg(target_os = "windows")]
 fn register_aumid() {
     use winreg::enums::HKEY_CURRENT_USER;
@@ -91,6 +96,7 @@ pub fn run() {
             commands::fetch_prs::check_pr_merged,
             commands::fetch_prs::open_url,
             set_tray_tooltip,
+            quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

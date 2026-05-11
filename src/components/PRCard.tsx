@@ -55,24 +55,34 @@ function cardBorderColor(decision: ReviewDecision, isDraft: boolean) {
   }
 }
 
-function Avatar({ login, avatarUrl, size = 20 }: { login: string; avatarUrl: string; size?: number }) {
-  return avatarUrl ? (
-    <img
-      src={avatarUrl}
-      alt={login}
-      title={login}
-      width={size}
-      height={size}
-      className="rounded-full"
-      style={{ width: size, height: size }}
-    />
-  ) : (
+const AVATAR_COLORS = [
+  { bg: "#dbeafe", text: "#1d4ed8" },
+  { bg: "#dcfce7", text: "#15803d" },
+  { bg: "#fef9c3", text: "#a16207" },
+  { bg: "#fce7f3", text: "#be185d" },
+  { bg: "#ede9fe", text: "#6d28d9" },
+  { bg: "#ffedd5", text: "#c2410c" },
+  { bg: "#ccfbf1", text: "#0f766e" },
+  { bg: "#e0f2fe", text: "#0369a1" },
+];
+
+function avatarColor(login: string) {
+  let hash = 0;
+  for (let i = 0; i < login.length; i++) hash = (hash * 31 + login.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function Avatar({ login, size = 20 }: { login: string; avatarUrl?: string; size?: number }) {
+  const initials = login.slice(0, 2).toUpperCase();
+  const color = avatarColor(login);
+  const fontSize = Math.max(8, Math.floor(size * 0.45));
+  return (
     <div
-      className="rounded-full bg-[var(--c-bg-inset)] flex items-center justify-center text-[10px] text-[var(--c-text-muted)] font-medium"
-      style={{ width: size, height: size }}
+      className="rounded-full flex items-center justify-center font-semibold select-none"
+      style={{ width: size, height: size, background: color.bg, color: color.text, fontSize }}
       title={login}
     >
-      {login[0]?.toUpperCase()}
+      {initials}
     </div>
   );
 }

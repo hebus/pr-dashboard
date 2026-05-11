@@ -7,6 +7,7 @@ import {
   Sun,
   Moon,
   Bell,
+  Power,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
@@ -169,6 +170,13 @@ export default function App() {
             title="Settings"
           >
             <SettingsIcon size={16} />
+          </button>
+          <button
+            onClick={() => invoke("quit_app")}
+            className="p-1.5 text-[var(--c-text-muted)] hover:text-red-500 transition-colors"
+            title="Quit application"
+          >
+            <Power size={16} />
           </button>
         </div>
       </header>
