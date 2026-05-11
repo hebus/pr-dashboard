@@ -362,15 +362,16 @@
     .modal-btn.close:hover { border-color: var(--red); color: var(--red); }
 
     .modal-diagram {
-      flex: 1; overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
-      padding: 24px;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
       min-height: 360px;
     }
     .modal-diagram svg {
       max-width: none;
       touch-action: none;
       user-select: none;
+      display: block;
     }
 
     /* ── Theme toggle in nav ── */
@@ -1025,7 +1026,7 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
   function app() {
     return {
       dark: true,
-      modal: { open: false, scale: 1 },
+      modal: { open: false, scale: 1, initX: 0, initY: 0 },
       pz: null,
 
       init() {
@@ -1067,33 +1068,51 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
       // ── Diagram modal ──
       openModal(svg) {
         const clone = svg.cloneNode(true);
-        // Make SVG fill the container nicely
         clone.removeAttribute("width");
         clone.removeAttribute("height");
-        clone.style.width  = "auto";
-        clone.style.height = "auto";
+        clone.style.width    = "auto";
+        clone.style.height   = "auto";
         clone.style.minWidth = "600px";
+        clone.style.display  = "block";
+
+        // Panzoom works better on a div wrapper than directly on SVG
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "inline-block";
+        wrapper.style.cursor  = "grab";
+        wrapper.appendChild(clone);
 
         const container = document.getElementById("pz-container");
         container.innerHTML = "";
-        container.appendChild(clone);
+        container.appendChild(wrapper);
         this.modal.open  = true;
         this.modal.scale = 1;
 
         this.$nextTick(() => {
-          this.pz = Panzoom(clone, {
-            maxScale: 10,
-            minScale: 0.2,
-            contain: "outside",
-            canvas: true,
+          this.pz = Panzoom(wrapper, { maxScale: 10, minScale: 0.2, step: 0.9 });
+
+          // rAF ensures SVG layout is complete before reading dimensions
+          requestAnimationFrame(() => {
+            const x = Math.max(24, (container.offsetWidth  - wrapper.offsetWidth)  / 2);
+            const y = Math.max(24, (container.offsetHeight - wrapper.offsetHeight) / 2);
+            this.pz.pan(x, y, { animate: false });
+            this.modal.initX = x;
+            this.modal.initY = y;
           });
+
+          // Scroll to zoom centered on cursor — works correctly without flex interference
           container.addEventListener("wheel", (e) => {
+            e.preventDefault();
             this.pz.zoomWithWheel(e);
-            this.modal.scale = this.pz.getScale();
           }, { passive: false });
-          clone.addEventListener("panzoomchange", () => {
-            this.modal.scale = this.pz.getScale();
+
+          // Single source of truth for scale: the panzoomchange event
+          wrapper.addEventListener("panzoomchange", (e) => {
+            this.modal.scale = e.detail.scale;
           });
+
+          // Cursor feedback while dragging
+          wrapper.addEventListener("pointerdown", () => wrapper.style.cursor = "grabbing");
+          wrapper.addEventListener("pointerup",   () => wrapper.style.cursor = "grab");
         });
       },
 
@@ -1102,9 +1121,26 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
         if (this.pz) { this.pz.destroy(); this.pz = null; }
       },
 
-      zoomIn()    { if (this.pz) { this.pz.zoomIn();  this.modal.scale = this.pz.getScale(); } },
-      zoomOut()   { if (this.pz) { this.pz.zoomOut(); this.modal.scale = this.pz.getScale(); } },
-      zoomReset() { if (this.pz) { this.pz.reset();   this.modal.scale = 1; } },
+      _zoomFromCenter(direction) {
+        if (!this.pz) return;
+        const rect = document.getElementById("pz-container").getBoundingClientRect();
+        // Reuse zoomWithWheel (the path that already works) with a synthetic
+        // event locked to the container center
+        this.pz.zoomWithWheel({
+          clientX:     rect.left + rect.width  / 2,
+          clientY:     rect.top  + rect.height / 2,
+          deltaY:      direction,   // negative = zoom in, positive = zoom out
+          preventDefault: () => {},
+        });
+      },
+      zoomIn()  { this._zoomFromCenter(-1); },
+      zoomOut() { this._zoomFromCenter(+1); },
+      zoomReset() {
+        if (!this.pz) return;
+        this.pz.zoom(1, { animate: false });
+        this.pz.pan(this.modal.initX, this.modal.initY, { animate: false });
+        this.modal.scale = 1;
+      },
 
       // ── Theme toggle ──
       toggleTheme() {
