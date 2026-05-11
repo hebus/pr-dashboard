@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PR Dashboard — Architecture</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4/dist/panzoom.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
   <style>
+    [x-cloak] { display: none !important; }
+
     :root {
       --bg: #0d1117;
       --bg-subtle: #161b22;
       --bg-card: #1c2128;
+      --bg-hover: #21262d;
       --border: #30363d;
       --text: #e6edf3;
       --text-muted: #8b949e;
@@ -19,6 +24,15 @@
       --red: #f85149;
       --purple: #bc8cff;
       --sidebar-w: 260px;
+    }
+    :root.light {
+      --bg: #ffffff;
+      --bg-subtle: #f6f8fa;
+      --bg-card: #f0f2f5;
+      --bg-hover: #e8eaed;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --text-muted: #57606a;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -261,9 +275,126 @@
 
     /* ── Section anchor offset for fixed header ── */
     section { scroll-margin-top: 24px; }
+
+    /* ── Diagram zoom hint ── */
+    .diagram-wrap {
+      position: relative;
+      transition: border-color 0.15s;
+    }
+    .diagram-wrap.zoomable { cursor: zoom-in; }
+    .diagram-wrap.zoomable:hover { border-color: var(--accent); }
+    .diagram-wrap.zoomable::after {
+      content: '⌕  Cliquer pour agrandir';
+      position: absolute;
+      bottom: 10px; right: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 8px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .diagram-wrap.zoomable:hover::after { opacity: 1; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(1, 4, 9, 0.88);
+      backdrop-filter: blur(5px);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      animation: overlayIn 0.15s ease;
+    }
+    @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%; max-width: 1200px; max-height: 90vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: boxIn 0.18s ease;
+    }
+    @keyframes boxIn {
+      from { transform: scale(0.96) translateY(8px); opacity: 0; }
+      to   { transform: scale(1)    translateY(0);   opacity: 1; }
+    }
+
+    .modal-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-subtle);
+      flex-shrink: 0;
+    }
+    .modal-meta { display: flex; align-items: center; gap: 10px; }
+    .modal-hint {
+      font-size: 11px; color: var(--text-muted);
+    }
+    .modal-scale {
+      font-size: 12px; font-family: monospace;
+      color: var(--accent);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 7px;
+      min-width: 52px; text-align: center;
+    }
+    .modal-actions { display: flex; gap: 6px; }
+    .modal-btn {
+      width: 30px; height: 30px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 15px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s;
+      font-family: monospace; font-weight: 700;
+    }
+    .modal-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-hover); }
+    .modal-btn.close:hover { border-color: var(--red); color: var(--red); }
+
+    .modal-diagram {
+      flex: 1; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      min-height: 360px;
+    }
+    .modal-diagram svg {
+      max-width: none;
+      touch-action: none;
+      user-select: none;
+    }
+
+    /* ── Theme toggle in nav ── */
+    .nav-footer {
+      padding: 16px 20px 0;
+      border-top: 1px solid var(--border);
+      margin-top: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .theme-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px 12px;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.15s;
+    }
+    .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 </head>
-<body>
+<body x-data="app()">
 
 <!-- ═══════════════════════════════════════════════════════ SIDEBAR -->
 <nav>
@@ -295,6 +426,13 @@
   <a href="#ipc">Frontend ↔ Backend</a>
   <a href="#polling">Polling & Performance</a>
   <a href="#run">Lancer l'application</a>
+
+  <div class="nav-footer">
+    <span style="font-size:11px;color:var(--text-muted)">Thème</span>
+    <button class="theme-btn" @click="toggleTheme()" :title="dark ? 'Passer en mode clair' : 'Passer en mode sombre'">
+      <span x-text="dark ? '☀️ Clair' : '🌙 Sombre'"></span>
+    </button>
+  </div>
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════ MAIN -->
@@ -842,7 +980,29 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
 
 </main>
 
+<!-- ═══════════════════════════════════════════════════════ MODAL -->
+<div x-cloak x-show="modal.open" class="modal-overlay"
+     @click.self="closeModal()"
+     @keydown.escape.window="closeModal()">
+  <div class="modal-box">
+    <div class="modal-toolbar">
+      <div class="modal-meta">
+        <span class="modal-scale" x-text="Math.round(modal.scale * 100) + '%'">100%</span>
+        <span class="modal-hint">Scroll pour zoomer · Drag pour déplacer · Échap pour fermer</span>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn" @click="zoomIn()"    title="Zoom avant (+)">+</button>
+        <button class="modal-btn" @click="zoomReset()" title="Réinitialiser (0)">⊙</button>
+        <button class="modal-btn" @click="zoomOut()"   title="Zoom arrière (-)">−</button>
+        <button class="modal-btn close" @click="closeModal()" title="Fermer (Échap)">✕</button>
+      </div>
+    </div>
+    <div id="pz-container" class="modal-diagram"></div>
+  </div>
+</div>
+
 <script>
+  // ── Mermaid ──────────────────────────────────────────────────────
   mermaid.initialize({
     startOnLoad: true,
     theme: "dark",
@@ -861,19 +1021,98 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
     sequence: { diagramMarginX: 20, diagramMarginY: 20 },
   });
 
-  // Active nav link on scroll
-  const sections = document.querySelectorAll("section[id]");
-  const links = document.querySelectorAll("nav a[href^='#']");
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        links.forEach(l => l.classList.remove("active"));
-        const a = document.querySelector(`nav a[href="#${entry.target.id}"]`);
-        if (a) a.classList.add("active");
-      }
-    });
-  }, { rootMargin: "-20% 0px -70% 0px" });
-  sections.forEach(s => observer.observe(s));
+  // ── Alpine component ─────────────────────────────────────────────
+  function app() {
+    return {
+      dark: true,
+      modal: { open: false, scale: 1 },
+      pz: null,
+
+      init() {
+        // Scroll-spy nav
+        const sections = document.querySelectorAll("section[id]");
+        const links    = document.querySelectorAll("nav a[href^='#']");
+        const spy = new IntersectionObserver((entries) => {
+          entries.forEach(e => {
+            if (e.isIntersecting) {
+              links.forEach(l => l.classList.remove("active"));
+              const a = document.querySelector(`nav a[href="#${e.target.id}"]`);
+              if (a) a.classList.add("active");
+            }
+          });
+        }, { rootMargin: "-20% 0px -70% 0px" });
+        sections.forEach(s => spy.observe(s));
+
+        // Watch for Mermaid SVG injection and make diagrams zoomable
+        document.querySelectorAll(".diagram-wrap").forEach(wrap => {
+          const obs = new MutationObserver(() => {
+            const svg = wrap.querySelector("svg");
+            if (!svg) return;
+            obs.disconnect();
+            wrap.classList.add("zoomable");
+            wrap.addEventListener("click", () => this.openModal(svg));
+          });
+          obs.observe(wrap, { childList: true, subtree: true });
+        });
+
+        // Keyboard shortcuts while modal is open
+        document.addEventListener("keydown", (e) => {
+          if (!this.modal.open) return;
+          if (e.key === "+" || e.key === "=") this.zoomIn();
+          if (e.key === "-")                   this.zoomOut();
+          if (e.key === "0")                   this.zoomReset();
+        });
+      },
+
+      // ── Diagram modal ──
+      openModal(svg) {
+        const clone = svg.cloneNode(true);
+        // Make SVG fill the container nicely
+        clone.removeAttribute("width");
+        clone.removeAttribute("height");
+        clone.style.width  = "auto";
+        clone.style.height = "auto";
+        clone.style.minWidth = "600px";
+
+        const container = document.getElementById("pz-container");
+        container.innerHTML = "";
+        container.appendChild(clone);
+        this.modal.open  = true;
+        this.modal.scale = 1;
+
+        this.$nextTick(() => {
+          this.pz = Panzoom(clone, {
+            maxScale: 10,
+            minScale: 0.2,
+            contain: "outside",
+            canvas: true,
+          });
+          container.addEventListener("wheel", (e) => {
+            this.pz.zoomWithWheel(e);
+            this.modal.scale = this.pz.getScale();
+          }, { passive: false });
+          clone.addEventListener("panzoomchange", () => {
+            this.modal.scale = this.pz.getScale();
+          });
+        });
+      },
+
+      closeModal() {
+        this.modal.open = false;
+        if (this.pz) { this.pz.destroy(); this.pz = null; }
+      },
+
+      zoomIn()    { if (this.pz) { this.pz.zoomIn();  this.modal.scale = this.pz.getScale(); } },
+      zoomOut()   { if (this.pz) { this.pz.zoomOut(); this.modal.scale = this.pz.getScale(); } },
+      zoomReset() { if (this.pz) { this.pz.reset();   this.modal.scale = 1; } },
+
+      // ── Theme toggle ──
+      toggleTheme() {
+        this.dark = !this.dark;
+        document.documentElement.classList.toggle("light", !this.dark);
+      },
+    };
+  }
 </script>
 </body>
 </html>
