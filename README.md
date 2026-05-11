@@ -134,7 +134,7 @@ pr-dashboard/
     └── tauri.conf.json     # App config (name, window size, bundle)
 ```
 
-Full architecture details in [ARCHITECTURE.md](./ARCHITECTURE.md).
+Full architecture details in [ARCHITECTURE.md](./guides/ARCHITECTURE.md).
 
 ---
 
