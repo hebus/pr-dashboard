@@ -1,6 +1,7 @@
-import { GitPullRequest, GitMerge, Clock, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import type { PullRequest, ReviewDecision } from "../types";
+import type { PullRequest, ReviewDecision, Reviewer } from "../types";
 import { timeAgo } from "../types";
 
 interface Props {
@@ -43,6 +44,14 @@ function reviewBadge(decision: ReviewDecision, isDraft: boolean) {
         </span>
       );
   }
+}
+
+function cardBgColor(decision: ReviewDecision, approvers: Reviewer[], isDraft: boolean) {
+  if (!isDraft && decision === "APPROVED")
+    return "bg-[var(--c-card-approved-bg)] hover:bg-[var(--c-card-approved-bg-hover)]";
+  if (!isDraft && approvers.length > 0)
+    return "bg-[var(--c-card-partial-bg)] hover:bg-[var(--c-card-partial-bg-hover)]";
+  return "bg-[var(--c-bg-subtle)] hover:bg-[var(--c-bg-hover)]";
 }
 
 function cardBorderColor(decision: ReviewDecision, isDraft: boolean) {
@@ -92,15 +101,29 @@ function labelColor(hex: string) {
 }
 
 export function PRCard({ pr }: Props) {
+  const [copied, setCopied] = useState(false);
+
   async function openPR() {
     await invoke("open_url", { url: pr.url });
   }
 
+  async function copyBranch(e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(pr.headRefName);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
   const borderClass = cardBorderColor(pr.reviewDecision, pr.isDraft);
+  const bgClass = cardBgColor(pr.reviewDecision, pr.approvers, pr.isDraft);
 
   return (
     <div
-      className={`bg-[var(--c-bg-subtle)] border border-[var(--c-border)] ${borderClass} rounded-lg p-3 hover:bg-[var(--c-bg-hover)] transition-colors cursor-pointer group`}
+      className={`${bgClass} border border-[var(--c-border)] ${borderClass} rounded-lg p-3 transition-colors cursor-pointer group`}
       onClick={openPR}
     >
       <div className="flex items-start justify-between gap-2">
@@ -130,7 +153,19 @@ export function PRCard({ pr }: Props) {
               <div className="flex items-center gap-1 text-[11px] text-[var(--c-text-muted)] font-mono">
                 <span>{pr.baseRefName}</span>
                 <ChevronRight size={10} />
-                <span>{pr.headRefName}</span>
+                <button
+                  type="button"
+                  onClick={copyBranch}
+                  title={copied ? "Copied!" : `Copy "${pr.headRefName}"`}
+                  className="inline-flex items-center gap-1 rounded px-1 -mx-1 py-0.5 hover:bg-[var(--c-bg-inset)] hover:text-[var(--c-text)] transition-colors"
+                >
+                  <span>{pr.headRefName}</span>
+                  {copied ? (
+                    <Check size={10} className="text-[var(--c-green)]" />
+                  ) : (
+                    <Copy size={10} className="opacity-0 group-hover:opacity-60" />
+                  )}
+                </button>
               </div>
             </div>
           </div>

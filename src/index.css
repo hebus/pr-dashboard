@@ -22,11 +22,16 @@ body {
   --c-text-subtle:     #6e7781;
   --c-accent:          #0969da;
 
-  --c-green:           #1a7f37;
-  --c-green-bg:        #dafbe1;
-  --c-green-border:    #1a7f37;
-  --c-green-btn:       #1a7f37;
-  --c-green-btn-hover: #116329;
+  --c-green:                   #1a7f37;
+  --c-green-bg:                #dafbe1;
+  --c-green-border:            #1a7f37;
+  --c-green-btn:               #1a7f37;
+  --c-green-btn-hover:         #116329;
+
+  --c-card-partial-bg:         #f0fdf4;
+  --c-card-partial-bg-hover:   #e2faea;
+  --c-card-approved-bg:        #d4f8de;
+  --c-card-approved-bg-hover:  #c1f2cc;
 
   --c-amber:           #9a6700;
   --c-amber-bg:        #fff8c5;
@@ -49,11 +54,16 @@ body {
   --c-text-subtle:     #484f58;
   --c-accent:          #58a6ff;
 
-  --c-green:           #3fb950;
-  --c-green-bg:        #1a4428;
-  --c-green-border:    #238636;
-  --c-green-btn:       #238636;
-  --c-green-btn-hover: #2ea043;
+  --c-green:                   #3fb950;
+  --c-green-bg:                #1a4428;
+  --c-green-border:            #238636;
+  --c-green-btn:               #238636;
+  --c-green-btn-hover:         #2ea043;
+
+  --c-card-partial-bg:         #0b1e12;
+  --c-card-partial-bg-hover:   #0e2416;
+  --c-card-approved-bg:        #0f2e1a;
+  --c-card-approved-bg-hover:  #143d22;
 
   --c-amber:           #d29922;
   --c-amber-bg:        #2d2005;

@@ -38,7 +38,7 @@ pr-dashboard/
 │   │   ├── ErrorBoundary.tsx     # Capture les erreurs React
 │   │   ├── FilterBar.tsx         # Barre recherche + toggle All/Pending/Approved
 │   │   ├── RepoGroup.tsx         # Groupe collapsible par repository (avec squelettes au premier chargement)
-│   │   ├── PRCard.tsx            # Carte d'une Pull Request
+│   │   ├── PRCard.tsx            # Carte d'une Pull Request (nom de branche cliquable → copie clipboard)
 │   │   ├── ToastContainer.tsx    # Toasts in-app (slide-in, barre de progression, cliquables)
 │   │   ├── NotificationPanel.tsx # Panneau dropdown historique des notifications (icône cloche dans le header)
 │   │   └── Settings.tsx          # Modal de configuration (token, repos, intervalle, test notification)
@@ -205,6 +205,21 @@ Au premier lancement (avant que les données GitHub ne soient disponibles), `Rep
 - Badge de review
 
 La condition d'affichage est `isLoading && prs.length === 0` : les squelettes n'apparaissent qu'au **premier fetch** (pas données en cache). Les refreshs en arrière-plan restent discrets — seul le spinner dans l'en-tête du groupe tourne.
+
+---
+
+## Interactions sur la carte PR (`PRCard`)
+
+| Cible | Action | Comportement |
+|-------|--------|-------------|
+| Carte (zone générale) | Clic | Ouvre la PR dans le navigateur (`invoke("open_url")`) |
+| Nom de la branche source (`headRefName`) | Clic | Copie le nom de branche dans le presse-papiers via `navigator.clipboard.writeText` |
+
+Le nom de branche est rendu comme un `<button>` :
+- `e.stopPropagation()` empêche le clic d'ouvrir aussi la PR.
+- Une icône `Copy` (lucide) apparaît au survol de la carte (`opacity-0 group-hover:opacity-60`) ; après copie elle bascule en `Check` vert pendant 1,5 s via un état local `copied` (`setTimeout`).
+- Le `title` reflète l'état : `Copy "<branche>"` ou `Copied!`.
+- `navigator.clipboard` est disponible dans la WebView2 (Tauri) ; l'appel est protégé par un `try/catch` silencieux si l'API est indisponible.
 
 ---
 
