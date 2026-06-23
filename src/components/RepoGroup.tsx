@@ -5,6 +5,7 @@ import {
   RefreshCw,
   AlertCircle,
   ExternalLink,
+  GitBranch,
 } from "lucide-react";
 
 function SkeletonCard({ titleW }: { titleW: string }) {
@@ -73,6 +74,13 @@ export function RepoGroup({
       String(pr.number).includes(q)
     );
   });
+
+  const byBranch = filtered.reduce((map, pr) => {
+    if (!map.has(pr.baseRefName)) map.set(pr.baseRefName, []);
+    map.get(pr.baseRefName)!.push(pr);
+    return map;
+  }, new Map<string, PullRequest[]>());
+  const branchEntries = Array.from(byBranch.entries());
 
   const pendingCount  = prs.filter((pr) => pr.reviewDecision !== "APPROVED").length;
   const approvedCount = prs.filter((pr) => pr.reviewDecision === "APPROVED").length;
@@ -159,10 +167,27 @@ export function RepoGroup({
             <div className="text-center py-6 text-[var(--c-text-muted)] text-sm">
               No pull requests match the current filter.
             </div>
-          ) : (
+          ) : branchEntries.length <= 1 ? (
             <div className="flex flex-col gap-2">
               {filtered.map((pr) => (
                 <PRCard key={pr.number} pr={pr} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {branchEntries.map(([branch, bPrs]) => (
+                <div key={branch}>
+                  <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                    <GitBranch size={12} className="text-[var(--c-text-subtle)]" />
+                    <span className="text-[11px] font-medium text-[var(--c-text-muted)]">{branch}</span>
+                    <span className="text-[11px] text-[var(--c-text-subtle)]">· {bPrs.length}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {bPrs.map((pr) => (
+                      <PRCard key={pr.number} pr={pr} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
