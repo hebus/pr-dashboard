@@ -3,6 +3,8 @@
 > Desktop app to monitor GitHub Pull Requests and GitLab Merge Requests in real-time — built with Tauri 2 + React 19.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![GitHub](https://img.shields.io/badge/GitHub-supported-181717?logo=github&logoColor=white)
+![GitLab](https://img.shields.io/badge/GitLab-supported-fc6d26?logo=gitlab&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-2-purple)
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178c6)
