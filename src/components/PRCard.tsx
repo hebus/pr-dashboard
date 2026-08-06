@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import type { PullRequest, ReviewDecision, Reviewer } from "../types";
-import { timeAgo } from "../types";
+import type { Provider, PullRequest, ReviewDecision, Reviewer } from "../types";
+import { prPrefix, timeAgo } from "../types";
 
 interface Props {
   pr: PullRequest;
+  provider?: Provider;
 }
 
 function reviewBadge(decision: ReviewDecision, isDraft: boolean) {
@@ -100,7 +101,7 @@ function labelColor(hex: string) {
   return { bg: `#${hex}26`, text: `#${hex}`, border: `#${hex}66` };
 }
 
-export function PRCard({ pr }: Props) {
+export function PRCard({ pr, provider = "github" }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function openPR() {
@@ -132,7 +133,7 @@ export function PRCard({ pr }: Props) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[var(--c-text-muted)] text-xs font-mono">
-                #{pr.number}
+                {prPrefix(provider)}{pr.number}
               </span>
               <span className="text-sm font-medium text-[var(--c-text)] group-hover:text-[var(--c-accent)] transition-colors truncate">
                 {pr.title}

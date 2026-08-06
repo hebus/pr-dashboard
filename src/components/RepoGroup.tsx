@@ -35,8 +35,9 @@ function SkeletonCard({ titleW }: { titleW: string }) {
 import { useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type { RepositoryConfig, PullRequest, FilterStatus } from "../types";
-import { matchesFilter, timeAgo } from "../types";
+import { matchesFilter, prTerm, repoWebUrl, timeAgo } from "../types";
 import { PRCard } from "./PRCard";
+import { ProviderIcon } from "./ProviderIcon";
 
 interface Props {
   repo: RepositoryConfig;
@@ -47,7 +48,7 @@ interface Props {
   filter: FilterStatus;
   search: string;
   token: string;
-  githubUrl: string;
+  baseUrl: string;
 }
 
 export function RepoGroup({
@@ -59,7 +60,7 @@ export function RepoGroup({
   filter,
   search,
   token,
-  githubUrl,
+  baseUrl,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const queryClient = useQueryClient();
@@ -85,9 +86,13 @@ export function RepoGroup({
   const pendingCount  = prs.filter((pr) => pr.reviewDecision !== "APPROVED").length;
   const approvedCount = prs.filter((pr) => pr.reviewDecision === "APPROVED").length;
   const repoLabel     = repo.label ?? `${repo.owner}/${repo.name}`;
+  const term          = prTerm(repo.provider);
+  const providerName  = repo.provider === "gitlab" ? "GitLab" : "GitHub";
 
   function handleRefresh() {
-    queryClient.invalidateQueries({ queryKey: ["prs", repo.owner, repo.name] });
+    queryClient.invalidateQueries({
+      queryKey: ["prs", repo.provider, repo.owner, repo.name],
+    });
   }
 
   return (
@@ -101,6 +106,11 @@ export function RepoGroup({
             ? <ChevronRight size={16} className="text-[var(--c-text-muted)]" />
             : <ChevronDown  size={16} className="text-[var(--c-text-muted)]" />
           }
+          <ProviderIcon
+            provider={repo.provider}
+            size={13}
+            className="text-[var(--c-text-muted)] shrink-0"
+          />
           <span className="font-semibold text-sm text-[var(--c-text)]">{repoLabel}</span>
           {error && <AlertCircle size={14} className="text-[var(--c-red)]" />}
           {isLoading && !error && <RefreshCw size={12} className="text-[var(--c-text-muted)] animate-spin" />}
@@ -122,7 +132,7 @@ export function RepoGroup({
                 </span>
               )}
               {prs.length === 0 && !isLoading && (
-                <span className="text-[11px] text-[var(--c-text-muted)]">No open PRs</span>
+                <span className="text-[11px] text-[var(--c-text-muted)]">No open {term}s</span>
               )}
             </>
           )}
@@ -132,10 +142,10 @@ export function RepoGroup({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              invoke("open_url", { url: `${githubUrl}/${repo.owner}/${repo.name}/pulls` });
+              invoke("open_url", { url: repoWebUrl(baseUrl, repo) });
             }}
             className="text-[var(--c-text-muted)] hover:text-[var(--c-accent)] transition-colors"
-            title="Open on GitHub"
+            title={`Open on ${providerName}`}
           >
             <ExternalLink size={13} />
           </button>
@@ -165,12 +175,12 @@ export function RepoGroup({
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-6 text-[var(--c-text-muted)] text-sm">
-              No pull requests match the current filter.
+              No {repo.provider === "gitlab" ? "merge" : "pull"} requests match the current filter.
             </div>
           ) : branchEntries.length <= 1 ? (
             <div className="flex flex-col gap-2">
               {filtered.map((pr) => (
-                <PRCard key={pr.number} pr={pr} />
+                <PRCard key={pr.number} pr={pr} provider={repo.provider} />
               ))}
             </div>
           ) : (
@@ -184,7 +194,7 @@ export function RepoGroup({
                   </div>
                   <div className="flex flex-col gap-2">
                     {bPrs.map((pr) => (
-                      <PRCard key={pr.number} pr={pr} />
+                      <PRCard key={pr.number} pr={pr} provider={repo.provider} />
                     ))}
                   </div>
                 </div>

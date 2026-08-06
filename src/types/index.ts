@@ -1,15 +1,44 @@
+export type Provider = "github" | "gitlab";
+
 export interface Config {
   githubToken: string;
   githubUrl: string;
+  gitlabToken: string;
+  gitlabUrl: string;
   refreshInterval: number;
   repositories: RepositoryConfig[];
 }
 
 export interface RepositoryConfig {
   id: string;
+  provider: Provider;
+  /** GitHub: the owner. GitLab: the full namespace path, e.g. "sinequa/rnd". */
   owner: string;
   name: string;
   label?: string;
+}
+
+/** Token and base URL of the source a given repository belongs to. */
+export function providerCreds(config: Config, repo: RepositoryConfig) {
+  return repo.provider === "gitlab"
+    ? { token: config.gitlabToken, baseUrl: config.gitlabUrl }
+    : { token: config.githubToken, baseUrl: config.githubUrl };
+}
+
+export function repoWebUrl(baseUrl: string, repo: RepositoryConfig): string {
+  return repo.provider === "gitlab"
+    ? `${baseUrl}/${repo.owner}/${repo.name}/-/merge_requests`
+    : `${baseUrl}/${repo.owner}/${repo.name}/pulls`;
+}
+
+/** "PR" on GitHub, "MR" on GitLab — used in badges, toasts and empty states. */
+export function prTerm(provider: Provider): "PR" | "MR" {
+  return provider === "gitlab" ? "MR" : "PR";
+}
+
+/** GitLab writes merge request numbers as !123, GitHub as #123. */
+export function prPrefix(provider: Provider): "!" | "#" {
+  return provider === "gitlab" ? "!" : "#";
 }
 
 export interface Label {
@@ -55,6 +84,7 @@ export type FilterStatus = "all" | "pending" | "approved";
 
 export interface PREvent {
   type: "new_pr" | "merged";
+  provider: Provider;
   repo: string;
   prNumber: number;
   prTitle: string;

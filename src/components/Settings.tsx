@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { X, Plus, Trash2, Eye, EyeOff, GitPullRequest, Bell, CheckCircle } from "lucide-react";
-import type { Config, RepositoryConfig } from "../types";
+import type { Config, Provider, RepositoryConfig } from "../types";
 import { generateId } from "../types";
+import { ProviderIcon } from "./ProviderIcon";
+
+const DEFAULT_GITLAB_NAMESPACE = "sinequa/rnd";
 
 interface Props {
   config: Config;
@@ -20,11 +23,33 @@ function RepoInput({
   onRemove: () => void;
 }) {
   const inputCls = "px-2 py-1.5 bg-[var(--c-bg)] border border-[var(--c-border)] rounded text-sm text-[var(--c-text)] placeholder-[var(--c-text-subtle)] focus:outline-none focus:border-[var(--c-accent)]";
+  const isGitlab = repo.provider === "gitlab";
+
+  function toggleProvider() {
+    const provider: Provider = isGitlab ? "github" : "gitlab";
+    // Pre-fill the namespace when switching to GitLab, but never overwrite
+    // something the user already typed.
+    const owner =
+      provider === "gitlab" && repo.owner.trim() === ""
+        ? DEFAULT_GITLAB_NAMESPACE
+        : repo.owner;
+    onUpdate({ ...repo, provider, owner });
+  }
+
   return (
     <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={toggleProvider}
+        title={`Switch to ${isGitlab ? "GitHub" : "GitLab"}`}
+        className="flex items-center gap-1.5 shrink-0 w-[88px] px-2 py-1.5 bg-[var(--c-bg)] border border-[var(--c-border)] rounded text-xs font-medium text-[var(--c-text)] hover:bg-[var(--c-bg-hover)] transition-colors"
+      >
+        <ProviderIcon provider={repo.provider} size={13} />
+        {isGitlab ? "GitLab" : "GitHub"}
+      </button>
       <input
         type="text"
-        placeholder="owner"
+        placeholder={isGitlab ? "namespace" : "owner"}
         value={repo.owner}
         onChange={(e) => onUpdate({ ...repo, owner: e.target.value })}
         className={`w-28 ${inputCls}`}
@@ -42,7 +67,7 @@ function RepoInput({
         placeholder="Label (optional)"
         value={repo.label ?? ""}
         onChange={(e) => onUpdate({ ...repo, label: e.target.value || undefined })}
-        className={`w-36 ${inputCls}`}
+        className={`w-28 ${inputCls}`}
       />
       <button
         onClick={onRemove}
@@ -54,9 +79,82 @@ function RepoInput({
   );
 }
 
+const inputCls = "w-full px-3 py-2 bg-[var(--c-bg)] border border-[var(--c-border)] rounded text-sm text-[var(--c-text)] placeholder-[var(--c-text-subtle)] focus:outline-none focus:border-[var(--c-accent)]";
+const labelCls = "text-sm font-medium text-[var(--c-text)]";
+
+function SourceSection({
+  provider,
+  url,
+  token,
+  onUrlChange,
+  onTokenChange,
+}: {
+  provider: Provider;
+  url: string;
+  token: string;
+  onUrlChange: (v: string) => void;
+  onTokenChange: (v: string) => void;
+}) {
+  const [showToken, setShowToken] = useState(false);
+  const isGitlab = provider === "gitlab";
+  const name = isGitlab ? "GitLab" : "GitHub";
+
+  return (
+    <div className="flex flex-col gap-3 p-3 border border-[var(--c-border)] rounded-lg">
+      <div className="flex items-center gap-2">
+        <ProviderIcon provider={provider} size={14} />
+        <span className={labelCls}>{name}</span>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-[var(--c-text-muted)]">
+          {isGitlab
+            ? "URL de votre instance GitLab."
+            : "URL de votre instance GitHub (Enterprise ou github.com)."}
+        </label>
+        <input
+          type="text"
+          value={url}
+          onChange={(e) => onUrlChange(e.target.value.replace(/\/$/, ""))}
+          placeholder={isGitlab ? "https://gitlab.chapsvision.in" : "https://github.sinequa.com"}
+          className={`${inputCls} font-mono`}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-[var(--c-text-muted)]">
+          Personal Access Token with{" "}
+          <code className="bg-[var(--c-bg-inset)] px-1 rounded">
+            {isGitlab ? "read_api" : "repo"}
+          </code>{" "}
+          scope. Create one at{" "}
+          <span className="text-[var(--c-accent)] font-mono text-[11px]">
+            {url}
+            {isGitlab ? "/-/user_settings/personal_access_tokens" : "/settings/tokens"}
+          </span>.
+        </label>
+        <div className="relative">
+          <input
+            type={showToken ? "text" : "password"}
+            value={token}
+            onChange={(e) => onTokenChange(e.target.value)}
+            placeholder={isGitlab ? "glpat-..." : "ghp_..."}
+            className={`${inputCls} pr-10 font-mono`}
+          />
+          <button
+            onClick={() => setShowToken((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)] hover:text-[var(--c-text)] transition-colors"
+          >
+            {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Settings({ config, onSave, onClose, onTestNotification }: Props) {
   const [local, setLocal]         = useState<Config>(config);
-  const [showToken, setShowToken] = useState(false);
   const [saving, setSaving]       = useState(false);
   const [notifSent, setNotifSent] = useState(false);
 
@@ -73,7 +171,10 @@ export function Settings({ config, onSave, onClose, onTestNotification }: Props)
   function addRepo() {
     setLocal((c) => ({
       ...c,
-      repositories: [...c.repositories, { id: generateId(), owner: "", name: "" }],
+      repositories: [
+        ...c.repositories,
+        { id: generateId(), provider: "github", owner: "", name: "" },
+      ],
     }));
   }
 
@@ -97,12 +198,9 @@ export function Settings({ config, onSave, onClose, onTestNotification }: Props)
     setTimeout(() => setNotifSent(false), 3000);
   }
 
-  const inputCls = "w-full px-3 py-2 bg-[var(--c-bg)] border border-[var(--c-border)] rounded text-sm text-[var(--c-text)] placeholder-[var(--c-text-subtle)] focus:outline-none focus:border-[var(--c-accent)]";
-  const labelCls = "text-sm font-medium text-[var(--c-text)]";
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-[var(--c-bg-subtle)] border border-[var(--c-border)] rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-2xl bg-[var(--c-bg-subtle)] border border-[var(--c-border)] rounded-xl shadow-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--c-border)]">
           <div className="flex items-center gap-2">
             <GitPullRequest size={16} className="text-[var(--c-text)]" />
@@ -117,47 +215,21 @@ export function Settings({ config, onSave, onClose, onTestNotification }: Props)
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
-            <label className={labelCls}>GitHub URL</label>
-            <p className="text-xs text-[var(--c-text-muted)]">
-              URL de votre instance GitHub (Enterprise ou github.com).
-            </p>
-            <input
-              type="text"
-              value={local.githubUrl}
-              onChange={(e) =>
-                setLocal((c) => ({ ...c, githubUrl: e.target.value.replace(/\/$/, "") }))
-              }
-              placeholder="https://github.sinequa.com"
-              className={`${inputCls} font-mono`}
-            />
-          </div>
+          <SourceSection
+            provider="github"
+            url={local.githubUrl}
+            token={local.githubToken}
+            onUrlChange={(v) => setLocal((c) => ({ ...c, githubUrl: v }))}
+            onTokenChange={(v) => setLocal((c) => ({ ...c, githubToken: v }))}
+          />
 
-          <div className="flex flex-col gap-2">
-            <label className={labelCls}>GitHub Token (PAT)</label>
-            <p className="text-xs text-[var(--c-text-muted)]">
-              Personal Access Token with{" "}
-              <code className="bg-[var(--c-bg-inset)] px-1 rounded">repo</code> scope. Create one at{" "}
-              <span className="text-[var(--c-accent)] font-mono text-[11px]">
-                {local.githubUrl}/settings/tokens
-              </span>.
-            </p>
-            <div className="relative">
-              <input
-                type={showToken ? "text" : "password"}
-                value={local.githubToken}
-                onChange={(e) => setLocal((c) => ({ ...c, githubToken: e.target.value }))}
-                placeholder="ghp_..."
-                className={`${inputCls} pr-10 font-mono`}
-              />
-              <button
-                onClick={() => setShowToken((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)] hover:text-[var(--c-text)] transition-colors"
-              >
-                {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          </div>
+          <SourceSection
+            provider="gitlab"
+            url={local.gitlabUrl}
+            token={local.gitlabToken}
+            onUrlChange={(v) => setLocal((c) => ({ ...c, gitlabUrl: v }))}
+            onTokenChange={(v) => setLocal((c) => ({ ...c, gitlabToken: v }))}
+          />
 
           <div className="flex flex-col gap-2">
             <label className={labelCls}>Refresh Interval</label>

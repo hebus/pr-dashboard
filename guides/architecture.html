@@ -414,7 +414,7 @@
 
   <div class="section-title">Fonctionnement</div>
   <a href="#dataflow">Flux de données</a>
-  <a href="#api">GitHub API</a>
+  <a href="#api">APIs GitHub / GitLab</a>
   <a href="#types">Types de données</a>
   <a href="#loading">Chargement initial</a>
 
@@ -456,21 +456,22 @@
       <span class="badge badge-green">TypeScript</span>
       <span class="badge badge-amber">Rust</span>
       <span class="badge badge-purple">GitHub Enterprise</span>
+      <span class="badge badge-purple">GitLab</span>
     </div>
     <p class="lead">
-      Application desktop qui affiche en temps réel les Pull Requests ouvertes sur plusieurs repositories GitHub Enterprise. Elle tourne dans le system tray, envoie des notifications desktop, et ne nécessite aucun navigateur.
+      Application desktop qui affiche en temps réel les Pull Requests et Merge Requests ouvertes sur plusieurs repositories GitHub Enterprise et GitLab. Elle tourne dans le system tray, envoie des notifications desktop, et ne nécessite aucun navigateur.
     </p>
 
     <h3>Comment ça marche en une phrase</h3>
-    <p>Le <strong style="color:var(--text)">frontend React</strong> interroge le <strong style="color:var(--text)">backend Rust</strong> via des commandes Tauri. Le Rust fait les appels HTTP vers <strong style="color:var(--text)">l'API GraphQL GitHub</strong> et renvoie les PRs. React Query gère le cache et le re-polling automatique.</p>
+    <p>Le <strong style="color:var(--text)">frontend React</strong> interroge le <strong style="color:var(--text)">backend Rust</strong> via des commandes Tauri. Le Rust fait les appels HTTP vers <strong style="color:var(--text)">l'API GraphQL de GitHub ou de GitLab</strong> selon la source du repo, et renvoie les PRs/MRs dans un modèle commun. React Query gère le cache et le re-polling automatique.</p>
 
     <div class="diagram-wrap">
       <div class="mermaid">
 graph LR
     A[👤 Utilisateur] -->|interagit| B[React UI]
     B -->|invoke| C[Rust / Tauri]
-    C -->|GraphQL| D[(GitHub API)]
-    D -->|PRs JSON| C
+    C -->|GraphQL| D[(GitHub / GitLab API)]
+    D -->|PRs / MRs JSON| C
     C -->|RepoPRs| B
     B -->|affiche| E[PR Cards]
     C -->|notifications| F[🔔 OS]
@@ -521,7 +522,7 @@ graph LR
       <div class="stack-card">
         <div class="icon">🌐</div>
         <div class="name">HTTP Rust</div>
-        <div class="role">Appels GitHub API (async)</div>
+        <div class="role">Appels GitHub / GitLab API (async)</div>
         <div class="tech">reqwest 0.12 + tokio</div>
       </div>
       <div class="stack-card">
@@ -571,7 +572,8 @@ graph LR
             <span class="ft-file">FilterBar.tsx</span><span class="ft-note">Recherche + toggle All / Pending / Approved</span><br>
             <span class="ft-file">NotificationPanel.tsx</span><span class="ft-note">Dropdown historique (icône cloche)</span><br>
             <span class="ft-file">ToastContainer.tsx</span><span class="ft-note">Toasts in-app (slide-in, barre progression)</span><br>
-            <span class="ft-file">Settings.tsx</span><span class="ft-note">Modal config (token, repos, intervalle…)</span><br>
+            <span class="ft-file">ProviderIcon.tsx</span><span class="ft-note">Logos GitHub / GitLab en SVG inline</span><br>
+            <span class="ft-file">Settings.tsx</span><span class="ft-note">Modal config (sources GitHub/GitLab, repos, intervalle…)</span><br>
             <span class="ft-file">ErrorBoundary.tsx</span><span class="ft-note">Capture les erreurs React</span><br>
           </div>
           <span class="ft-file">App.tsx</span><span class="ft-note">Racine : layout, état global, toggle thème, events PR</span><br>
@@ -587,7 +589,13 @@ graph LR
             <span class="ft-dir">commands/</span><br>
             <div class="ft-indent">
               <span class="ft-file">config.rs</span><span class="ft-note">get_config / save_config</span><br>
-              <span class="ft-file">fetch_prs.rs</span><span class="ft-note">fetch_repo_prs / check_pr_merged / open_url</span><br>
+              <span class="ft-file">fetch_prs.rs</span><span class="ft-note">fetch_repo_prs / check_pr_merged / open_url (dispatch)</span><br>
+            </div>
+            <span class="ft-dir">providers/</span><span class="ft-note">Domaine : un module par source, sans dépendance à Tauri</span><br>
+            <div class="ft-indent">
+              <span class="ft-file">common.rs</span><span class="ft-note">Types partagés + make_client, normalize_hex, absolutize</span><br>
+              <span class="ft-file">github.rs</span><span class="ft-note">GraphQL GitHub + mapping + check_merged (REST v3)</span><br>
+              <span class="ft-file">gitlab.rs</span><span class="ft-note">GraphQL GitLab + mapping + check_merged + tests</span><br>
             </div>
           </div>
           <span class="ft-dir">capabilities/</span><br>
@@ -617,9 +625,11 @@ flowchart TD
 
     subgraph Q["React Query — une query par repo"]
         direction TB
-        RQ[useQueries] -->|invoke fetch_repo_prs\nevery N seconds| RUST
-        RUST["🦀 Rust\nfetch_repo_prs"] -->|GraphQL POST| GH[(GitHub\nAPI)]
+        RQ[useQueries] -->|invoke fetch_repo_prs\nprovider + token + baseUrl\nevery N seconds| RUST
+        RUST["🦀 Rust\ndispatch par provider"] -->|GraphQL POST| GH[(GitHub\nAPI)]
+        RUST -->|GraphQL POST| GL[(GitLab\nAPI)]
         GH -->|nodes JSON| RUST
+        GL -->|nodes JSON| RUST
         RUST -->|RepoPRs| RQ
     end
 
@@ -634,33 +644,36 @@ flowchart TD
     style APP fill:#1d4ed8,stroke:#3b82f6,color:#fff
     style RUST fill:#92400e,stroke:#d97706,color:#fff
     style GH fill:#166534,stroke:#3fb950,color:#fff
+    style GL fill:#7a3411,stroke:#fc6d26,color:#fff
     style STORE fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
     style LS fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
       </div>
     </div>
 
     <div class="callout callout-blue">
-      <p><strong>React Query</strong> gère automatiquement le cache et le re-fetch. Chaque repository a sa propre query (clé <code>["prs", owner, name]</code>), ce qui permet des rafraîchissements indépendants et un affichage partiel si un repo est lent.</p>
+      <p><strong>React Query</strong> gère automatiquement le cache et le re-fetch. Chaque repository a sa propre query (clé <code>["prs", provider, owner, name]</code>), ce qui permet des rafraîchissements indépendants et un affichage partiel si un repo est lent. Le provider fait partie de la clé pour que deux repos homonymes hébergés sur des sources différentes ne partagent pas de cache.</p>
     </div>
   </section>
 
   <!-- API -->
   <section id="api">
-    <h2>GitHub API</h2>
-    <p>L'application supporte <strong style="color:var(--text)">GitHub Enterprise Server (GHES)</strong>. L'URL de base est configurable. Tous les endpoints en sont dérivés automatiquement.</p>
+    <h2>APIs GitHub / GitLab</h2>
+    <p>L'application supporte <strong style="color:var(--text)">GitHub Enterprise Server (GHES)</strong> et <strong style="color:var(--text)">GitLab</strong> (self-hosted ou gitlab.com). L'URL de base de chaque source est configurable ; tous les endpoints en sont dérivés automatiquement.</p>
 
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Endpoint</th><th>URL construite</th></tr></thead>
+        <thead><tr><th>Usage</th><th>GitHub</th><th>GitLab</th></tr></thead>
         <tbody>
-          <tr><td>GraphQL</td><td><code>{githubUrl}/api/graphql</code></td></tr>
-          <tr><td>REST</td><td><code>{githubUrl}/api/v3/repos/{owner}/{repo}/pulls/{number}</code></td></tr>
-          <tr><td>Web</td><td><code>{githubUrl}/{owner}/{repo}/pulls</code></td></tr>
+          <tr><td>Liste des PR/MR</td><td><code>{githubUrl}/api/graphql</code></td><td><code>{gitlabUrl}/api/graphql</code></td></tr>
+          <tr><td>Vérification de merge</td><td><code>{githubUrl}/api/v3/repos/{owner}/{repo}/pulls/{number}</code></td><td><code>{gitlabUrl}/api/graphql</code></td></tr>
+          <tr><td>Web</td><td><code>{githubUrl}/{owner}/{repo}/pulls</code></td><td><code>{gitlabUrl}/{namespace}/{repo}/-/merge_requests</code></td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3>GraphQL — <code>fetch_repo_prs</code></h3>
+    <p>Authentification : <code>Authorization: Bearer &lt;token&gt;</code> dans les deux cas. Scopes requis : <code>repo</code> (GitHub), <code>read_api</code> (GitLab). <code>commands/fetch_prs.rs</code> ne fait que router vers <code>providers::github</code> ou <code>providers::gitlab</code> selon le <code>provider</code> du repo.</p>
+
+    <h3>GraphQL GitHub — <code>fetch_repo_prs</code></h3>
     <p>Un seul appel par repository pour récupérer les 50 PRs ouvertes les plus récentes :</p>
 
     <div class="diagram-wrap">
@@ -681,12 +694,59 @@ sequenceDiagram
       <p><strong>Note GHES :</strong> Le champ <code>requestedReviewers</code> n'est pas disponible sur toutes les versions de GitHub Enterprise Server — il a été retiré de la query pour éviter une erreur GraphQL bloquante.</p>
     </div>
 
-    <h3>REST — <code>check_pr_merged</code></h3>
+    <h3>REST GitHub — <code>check_pr_merged</code></h3>
     <p>Appelé uniquement quand une PR disparaît de la liste ouverte, pour distinguer une <em>fermeture</em> d'un <em>merge</em> :</p>
 
     <pre><code>GET {githubUrl}/api/v3/repos/{owner}/{repo}/pulls/{number}
 → { state: "closed", merged_at: "2024-..." }
   merged si merged_at ≠ null</code></pre>
+
+    <h3>GraphQL GitLab — <code>fetch_repo_prs</code></h3>
+    <p>Le chemin projet est <code>{owner}/{name}</code>, le <code>owner</code> d'un repo GitLab contenant le namespace complet (<code>sinequa/rnd</code>).</p>
+
+    <pre><code>query GetOpenMRs($fullPath: ID!, $first: Int!) {
+  project(fullPath: $fullPath) {
+    mergeRequests(state: opened, sort: UPDATED_DESC, first: $first) {
+      nodes {
+        iid title webUrl draft createdAt updatedAt
+        sourceBranch targetBranch approved
+        author { username avatarUrl }
+        labels(first: 10) { nodes { title color } }
+        approvedBy(first: 20) { nodes { username avatarUrl } }
+        reviewers(first: 20) {
+          nodes { username avatarUrl mergeRequestInteraction { reviewState } }
+        }
+      }
+    }
+  }
+}</code></pre>
+
+    <p>Particularités du schéma : <code>state: opened</code> est en minuscules alors que <code>sort: UPDATED_DESC</code> est en majuscules ; toutes les sous-connexions sont bornées par <code>first:</code> pour rester sous le plafond de complexité (250 en authentifié).</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Champ</th><th>Source GitLab</th><th>Traitement</th></tr></thead>
+        <tbody>
+          <tr><td><code>number</code></td><td><code>iid</code></td><td><code>iid</code> est une <strong style="color:var(--text)">String</strong> → parsée en <code>u64</code>, MR ignorée si le parse échoue</td></tr>
+          <tr><td><code>labels[].color</code></td><td><code>color</code></td><td>GitLab renvoie <code>#RRGGBB</code>, GitHub <code>RRGGBB</code> → <code>normalize_hex()</code></td></tr>
+          <tr><td><code>approvers</code></td><td><code>approvedBy.nodes</code></td><td>—</td></tr>
+          <tr><td><code>avatarUrl</code></td><td><code>avatarUrl</code></td><td><code>absolutize()</code> : peut être relative ou protocol-relative</td></tr>
+          <tr><td><code>reviewDecision</code></td><td>dérivé</td><td><code>REQUESTED_CHANGES</code> → <code>CHANGES_REQUESTED</code>, sinon <code>approved</code> → <code>APPROVED</code>, sinon <code>REVIEW_REQUIRED</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-amber">
+      <p><strong>Sémantique de <code>approved</code> :</strong> « toutes les approbations <em>requises</em> sont obtenues ». Une MR approuvée 1 fois sur 2 reste <code>REVIEW_REQUIRED</code> tout en exposant ses <code>approvers</code> → fond « partiellement approuvée », comme sur GitHub. Ne pas dériver <code>APPROVED</code> d'un <code>approvedBy</code> non vide.</p>
+    </div>
+
+    <h3>GraphQL GitLab — <code>check_pr_merged</code></h3>
+    <p>GraphQL plutôt que REST v4 : même endpoint, même auth, et aucun percent-encoding du chemin projet à gérer.</p>
+
+    <pre><code>query MrState($fullPath: ID!, $iid: String!) {
+  project(fullPath: $fullPath) { mergeRequest(iid: $iid) { state } }
+}
+→ merged si state == "merged"</code></pre>
   </section>
 
   <!-- TYPES -->
@@ -723,20 +783,35 @@ interface RepoPRs {
   lastUpdated: string | null;  // horodatage UTC du dernier fetch
 }
 
+type Provider = "github" | "gitlab";
+
 interface Config {
   githubToken:     string;
   githubUrl:       string;   // défaut: https://github.sinequa.com
+  gitlabToken:     string;
+  gitlabUrl:       string;   // défaut: https://gitlab.chapsvision.in
   refreshInterval: number;   // secondes, défaut: 60
   repositories:    RepositoryConfig[];
 }
 
+interface RepositoryConfig {
+  id:       string;
+  provider: Provider;  // défaut: "github"
+  owner:    string;    // GitHub : le owner · GitLab : le namespace complet ("sinequa/rnd")
+  name:     string;
+  label?:   string;
+}
+
 interface PREvent {
   type:     "new_pr" | "merged";
-  repo:     string;
+  provider: Provider;  // pilote la terminologie : "New PR" ou "New MR"
+  repo:     string;    // "owner/name" — affiché tel quel
   prNumber: number;
   prTitle:  string;
   url:      string;
 }</code></pre>
+
+    <p>Le modèle est <strong style="color:var(--text)">commun aux deux sources</strong> : une Merge Request GitLab est mappée sur <code>PullRequest</code> côté Rust, si bien qu'aucun composant d'affichage n'a besoin de connaître la source. Seuls la terminologie et les liens en dépendent, via <code>prTerm()</code>, <code>prPrefix()</code> et <code>repoWebUrl()</code>.</p>
   </section>
 
   <!-- LOADING -->
@@ -912,8 +987,8 @@ stateDiagram-v2
         <tbody>
           <tr><td><code>get_config</code></td><td>—</td><td>Lit la config depuis le store JSON</td></tr>
           <tr><td><code>save_config</code></td><td><code>config</code></td><td>Persiste la config sur disque</td></tr>
-          <tr><td><code>fetch_repo_prs</code></td><td><code>owner, repo, token, githubUrl</code></td><td>Appel GraphQL → <code>RepoPRs</code></td></tr>
-          <tr><td><code>check_pr_merged</code></td><td><code>owner, repo, number, token, githubUrl</code></td><td>Appel REST → <code>bool</code></td></tr>
+          <tr><td><code>fetch_repo_prs</code></td><td><code>provider, owner, repo, token, baseUrl</code></td><td>GraphQL GitHub ou GitLab → <code>RepoPRs</code></td></tr>
+          <tr><td><code>check_pr_merged</code></td><td><code>provider, owner, repo, number, token, baseUrl</code></td><td>REST v3 (GitHub) ou GraphQL (GitLab) → <code>bool</code></td></tr>
           <tr><td><code>open_url</code></td><td><code>url</code></td><td>Ouvre une URL dans le navigateur système</td></tr>
           <tr><td><code>set_tray_tooltip</code></td><td><code>tooltip</code></td><td>Met à jour le tooltip de l'icône tray</td></tr>
           <tr><td><code>quit_app</code></td><td>—</td><td>Quitte l'application (<code>app.exit(0)</code>)</td></tr>
@@ -924,18 +999,22 @@ stateDiagram-v2
     <pre><code>// Côté frontend (TypeScript)
 import { invoke } from "@tauri-apps/api/core";
 
+// token et baseUrl sont résolus par repo via providerCreds(config, repo)
+const { token, baseUrl } = providerCreds(config, repo);
 const data = await invoke("fetch_repo_prs", {
-  owner: "sinequa",
-  repo:  "sba-internal",
-  token: config.githubToken,
-  githubUrl: config.githubUrl,
+  provider: "gitlab",
+  owner: "sinequa/rnd",
+  repo:  "mon-repo",
+  token,
+  baseUrl,
 });
 // → RepoPRs</code></pre>
 
     <pre><code>// Côté backend (Rust)
 #[tauri::command]
-async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: String)
-  -> Result&lt;RepoPRs, String&gt; { … }</code></pre>
+async fn fetch_repo_prs(provider: Option&lt;Provider&gt;, owner: String, repo: String,
+                        token: String, base_url: String)
+  -> Result&lt;RepoPRs, String&gt; { … }   // dispatch vers providers::github | providers::gitlab</code></pre>
   </section>
 
   <!-- POLLING -->
@@ -949,7 +1028,7 @@ async fn fetch_repo_prs(owner: String, repo: String, token: String, github_url: 
           <tr><td>Cache</td><td>React Query maintient le dernier résultat affiché pendant le re-fetch</td></tr>
           <tr><td>Indépendance</td><td>Chaque repo a sa propre query — un timeout n'affecte pas les autres</td></tr>
           <tr><td>Refresh manuel</td><td>Bouton refresh → <code>queryClient.invalidateQueries(["prs"])</code></td></tr>
-          <tr><td>Désactivation</td><td>Queries désactivées (<code>enabled: false</code>) si token vide</td></tr>
+          <tr><td>Désactivation</td><td>Queries désactivées (<code>enabled: false</code>) si le token <em>de la source du repo</em> est vide</td></tr>
           <tr><td>Timeout HTTP</td><td>15 secondes côté Rust (reqwest)</td></tr>
           <tr><td>Intervalle</td><td>Configurable dans Settings (défaut : 60s)</td></tr>
         </tbody>

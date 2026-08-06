@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { X, Bell, CheckCheck, GitPullRequest, GitMerge } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { StoredNotification } from "../types";
-import { timeAgo } from "../types";
+import { prPrefix, prTerm, timeAgo } from "../types";
 
 interface Props {
   notifications: StoredNotification[];
@@ -74,6 +74,7 @@ export function NotificationPanel({
         <ul className="overflow-y-auto flex-1">
           {notifications.map((n) => {
             const isNew = n.event.type === "new_pr";
+            const term = prTerm(n.event.provider);
             return (
               <li
                 key={n.id}
@@ -96,13 +97,13 @@ export function NotificationPanel({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-[var(--c-text)]">
-                    {isNew ? "New PR" : "PR merged"}
+                    {isNew ? `New ${term}` : `${term} merged`}
                     <span className="font-normal text-[var(--c-text-muted)]">
                       {" "}· {n.event.repo}
                     </span>
                   </p>
                   <p className="text-[11px] text-[var(--c-text-muted)] truncate">
-                    #{n.event.prNumber} — {n.event.prTitle}
+                    {prPrefix(n.event.provider)}{n.event.prNumber} — {n.event.prTitle}
                   </p>
                   <p className="text-[10px] text-[var(--c-text-muted)] opacity-60 mt-0.5">
                     {timeAgo(n.timestamp)}

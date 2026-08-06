@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { X, GitPullRequest, GitMerge } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Toast } from "../hooks/useToast";
+import { prPrefix, prTerm } from "../types";
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   const [visible, setVisible] = useState(false);
   const isNew = toast.type === "new_pr";
+  const term = prTerm(toast.provider);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
@@ -36,13 +38,13 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-[var(--c-text)]">
-            {isNew ? "New PR" : "PR merged"}
+            {isNew ? `New ${term}` : `${term} merged`}
             <span className="font-normal text-[var(--c-text-muted)]">
               {" "}· {toast.repo}
             </span>
           </p>
           <p className="text-xs text-[var(--c-text-muted)] mt-0.5 truncate">
-            #{toast.prNumber} — {toast.prTitle}
+            {prPrefix(toast.provider)}{toast.prNumber} — {toast.prTitle}
           </p>
         </div>
         <button

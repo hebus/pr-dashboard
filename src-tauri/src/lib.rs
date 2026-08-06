@@ -1,4 +1,5 @@
 mod commands;
+mod providers;
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},

@@ -5,6 +5,8 @@ import type { Config } from "../types";
 const DEFAULT_CONFIG: Config = {
   githubToken: "",
   githubUrl: "https://github.sinequa.com",
+  gitlabToken: "",
+  gitlabUrl: "https://gitlab.chapsvision.in",
   refreshInterval: 60,
   repositories: [],
 };

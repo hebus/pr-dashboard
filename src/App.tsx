@@ -22,6 +22,7 @@ import { Settings } from "./components/Settings";
 import { ToastContainer } from "./components/ToastContainer";
 import { NotificationPanel } from "./components/NotificationPanel";
 import type { FilterStatus, PREvent } from "./types";
+import { providerCreds } from "./types";
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
@@ -75,8 +76,19 @@ export default function App() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const hasToken = config.githubToken.length > 0;
   const hasRepos = config.repositories.length > 0;
+  // Enough to work with as soon as one configured repo has a token for its own
+  // source — a missing token on the other source only affects its own group.
+  const hasToken = config.repositories.some(
+    (repo) => providerCreds(config, repo).token.length > 0,
+  );
+  const missingProviders = Array.from(
+    new Set(
+      config.repositories
+        .filter((repo) => providerCreds(config, repo).token.length === 0)
+        .map((repo) => (repo.provider === "gitlab" ? "GitLab" : "GitHub")),
+    ),
+  );
 
   const { totalPending, totalApproved } = useMemo(() => {
     let pending = 0;
@@ -186,12 +198,14 @@ export default function App() {
           <GitPullRequest size={40} className="text-[var(--c-border)]" />
           <div>
             <p className="text-[var(--c-text)] font-medium mb-1">
-              {!hasToken ? "Configure your GitHub token" : "Add repositories to monitor"}
+              {!hasRepos
+                ? "Add repositories to monitor"
+                : `Configure your ${missingProviders.join(" / ")} token`}
             </p>
             <p className="text-sm text-[var(--c-text-muted)]">
-              {!hasToken
-                ? "Open Settings to add your Personal Access Token and repositories."
-                : "Open Settings to add GitHub repositories."}
+              {!hasRepos
+                ? "Open Settings to add GitHub or GitLab repositories."
+                : "Open Settings to add the Personal Access Token for that source."}
             </p>
           </div>
           <button
@@ -216,6 +230,7 @@ export default function App() {
             <div className="flex flex-col gap-3 max-w-4xl mx-auto">
               {config.repositories.map((repo, i) => {
                 const query = queries[i];
+                const { token, baseUrl } = providerCreds(config, repo);
                 return (
                   <RepoGroup
                     key={repo.id}
@@ -226,8 +241,8 @@ export default function App() {
                     isLoading={query?.isFetching ?? false}
                     filter={filter}
                     search={search}
-                    token={config.githubToken}
-                    githubUrl={config.githubUrl}
+                    token={token}
+                    baseUrl={baseUrl}
                   />
                 );
               })}
@@ -244,6 +259,7 @@ export default function App() {
           onTestNotification={() => {
             const event = {
               type: "new_pr" as const,
+              provider: "github" as const,
               repo: "sinequa/test",
               prNumber: 42,
               prTitle: "This is a test notification",
