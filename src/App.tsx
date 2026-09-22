@@ -24,6 +24,10 @@ import { NotificationPanel } from "./components/NotificationPanel";
 import type { FilterStatus, PREvent } from "./types";
 import { providerCreds } from "./types";
 
+function isTauri(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [search, setSearch] = useState("");
@@ -42,7 +46,7 @@ export default function App() {
 
   const handlePREvent = useCallback(async (event: PREvent) => {
     addNotification(event);
-    const visible = await getCurrentWindow().isVisible();
+    const visible = isTauri() ? await getCurrentWindow().isVisible() : true;
     if (visible) {
       addToast(event);
     } else {
@@ -51,6 +55,7 @@ export default function App() {
   }, [addToast, addNotification]);
 
   useEffect(() => {
+    if (!isTauri()) return;
     let cleanup: (() => void) | undefined;
     getCurrentWindow()
       .listen("tauri://focus", () => {
