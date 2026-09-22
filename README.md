@@ -19,7 +19,6 @@ Keep an eye on all your open PRs across multiple repositories without ever leavi
 - Instant visibility on every open PR — draft, pending review, approved, changes requested
 - Native desktop notifications when a new PR is opened or merged
 - A toast history panel so you never miss an event, even when the window is hidden
-- System tray integration — minimize to tray, badge tooltip updates when events happen in the background
 - Light/dark theme
 
 ---
@@ -35,7 +34,6 @@ Keep an eye on all your open PRs across multiple repositories without ever leavi
 | **Native notifications** | OS-level toast notifications (Windows) via `tauri-plugin-notification` |
 | **In-app toasts** | Slide-in toasts with progress bar — fallback when OS notifications are blocked |
 | **Notification history** | Bell icon with unread badge, full history panel with mark-as-read |
-| **System tray** | Click-to-toggle window, pending event count in tooltip |
 | **GitHub Enterprise** | Fully supports GHES — just set your instance URL in settings |
 | **GitLab** | Self-hosted or gitlab.com; MR numbers shown as `!123`, approvals and « changes requested » included |
 | **Persistent config** | Tokens, repos, interval stored in `%APPDATA%` via `tauri-plugin-store` |
@@ -141,7 +139,7 @@ pr-dashboard/
 │   └── App.tsx             # Root — layout, state orchestration, theme
 └── src-tauri/              # Rust backend
     ├── src/
-    │   ├── lib.rs          # Tauri init, tray, AUMID registration
+    │   ├── lib.rs          # Tauri init, AUMID registration
     │   ├── commands/       # get_config, save_config, fetch_repo_prs, check_pr_merged
     │   └── providers/      # One module per source: common, github, gitlab
     ├── capabilities/       # Tauri permission manifest

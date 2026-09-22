@@ -47,10 +47,6 @@ export default function App() {
       addToast(event);
     } else {
       pendingRef.current.push(event);
-      const count = pendingRef.current.length;
-      invoke("set_tray_tooltip", {
-        tooltip: `PR Dashboard — ${count} new event${count > 1 ? "s" : ""}`,
-      }).catch(() => {});
     }
   }, [addToast, addNotification]);
 
@@ -62,7 +58,6 @@ export default function App() {
         if (pending.length > 0) {
           pending.forEach(addToast);
           pendingRef.current = [];
-          invoke("set_tray_tooltip", { tooltip: "PR Dashboard" }).catch(() => {});
         }
       })
       .then((unlisten) => { cleanup = unlisten; });

@@ -420,7 +420,6 @@
 
   <div class="section-title">Fonctionnalités</div>
   <a href="#notifications">Notifications</a>
-  <a href="#tray">System Tray</a>
   <a href="#theming">Theming</a>
 
   <div class="section-title">Intégration</div>
@@ -459,7 +458,7 @@
       <span class="badge badge-purple">GitLab</span>
     </div>
     <p class="lead">
-      Application desktop qui affiche en temps réel les Pull Requests et Merge Requests ouvertes sur plusieurs repositories GitHub Enterprise et GitLab. Elle tourne dans le system tray, envoie des notifications desktop, et ne nécessite aucun navigateur.
+      Application desktop qui affiche en temps réel les Pull Requests et Merge Requests ouvertes sur plusieurs repositories GitHub Enterprise et GitLab. Elle envoie des notifications desktop et ne nécessite aucun navigateur.
     </p>
 
     <h3>Comment ça marche en une phrase</h3>
@@ -516,7 +515,7 @@ graph LR
       <div class="stack-card">
         <div class="icon">🦀</div>
         <div class="name">Shell desktop</div>
-        <div class="role">Fenêtre native, tray, commandes IPC</div>
+        <div class="role">Fenêtre native, commandes IPC</div>
         <div class="tech">Tauri 2 (Rust)</div>
       </div>
       <div class="stack-card">
@@ -584,7 +583,7 @@ graph LR
         <div class="ft-indent">
           <span class="ft-dir">src/</span><br>
           <div class="ft-indent">
-            <span class="ft-file">lib.rs</span><span class="ft-note">Init Tauri : plugins, tray, handlers, AUMID, tooltip</span><br>
+            <span class="ft-file">lib.rs</span><span class="ft-note">Init Tauri : plugins, handlers, AUMID, quit_app</span><br>
             <span class="ft-file">main.rs</span><span class="ft-note">Point d'entrée (délègue à lib.rs)</span><br>
             <span class="ft-dir">commands/</span><br>
             <div class="ft-indent">
@@ -600,7 +599,7 @@ graph LR
           </div>
           <span class="ft-dir">capabilities/</span><br>
           <div class="ft-indent">
-            <span class="ft-file">default.json</span><span class="ft-note">Permissions Tauri (tray, store, notification, opener)</span><br>
+            <span class="ft-file">default.json</span><span class="ft-note">Permissions Tauri (store, notification, opener)</span><br>
           </div>
           <span class="ft-file">Cargo.toml</span><span class="ft-note">Dépendances Rust</span><br>
           <span class="ft-file">tauri.conf.json</span><span class="ft-note">Config Tauri (nom, fenêtre, bundle)</span><br>
@@ -638,7 +637,7 @@ flowchart TD
 
     Q -->|événements détectés| EV{PREvent}
     EV -->|fenêtre visible| TOAST[ToastContainer]
-    EV -->|fenêtre cachée| TRAY[🖥️ Tray tooltip\n+N events]
+    EV -->|fenêtre non visible| PEND[pendingRef\ntoasts en attente]
     EV -->|toujours| NOTIF[NotificationPanel\nhistorique]
 
     style APP fill:#1d4ed8,stroke:#3b82f6,color:#fff
@@ -846,13 +845,13 @@ flowchart TD
     EMIT --> UPDATE["Mettre à jour le ref\navec l'état actuel"]
 
     EMIT -->|fenêtre visible| TOAST[Toast in-app]
-    EMIT -->|fenêtre cachée| TRAY["Tray tooltip\n+N events"]
+    EMIT -->|fenêtre non visible| PEND["pendingRef\ntoast en attente"]
     EMIT --> HIST[Historique notifications]
 
     style NEW fill:#166534,stroke:#3fb950,color:#fff
     style MRG fill:#4c1d95,stroke:#8b5cf6,color:#fff
     style TOAST fill:#1e3a5f,stroke:#58a6ff,color:#e6edf3
-    style TRAY fill:#1c2128,stroke:#30363d,color:#e6edf3
+    style PEND fill:#1c2128,stroke:#30363d,color:#e6edf3
       </div>
     </div>
 
@@ -860,27 +859,22 @@ flowchart TD
       <p><strong>Premier démarrage :</strong> le <code>useRef</code> est vide, donc aucune notification ne tire lors du premier fetch. Les notifications démarrent à partir du second poll.</p>
     </div>
 
-    <h3>Comportement fenêtre cachée (tray)</h3>
+    <h3>Comportement fenêtre non visible</h3>
+    <p>Il n'y a plus de mise en arrière-plan : fermer la fenêtre (croix ✕) quitte directement l'application. Ce chemin ne joue donc que si la fenêtre perd le focus sans être fermée (minimisée, autre fenêtre au premier plan).</p>
     <div class="diagram-wrap">
       <div class="mermaid">
 sequenceDiagram
     participant U as 👤 Utilisateur
-    participant W as Fenêtre (cachée)
-    participant T as 🖥️ Tray icon
-    participant R as 🦀 Rust
+    participant W as Fenêtre (non visible)
 
-    note over W: Fenêtre cachée dans le tray
+    note over W: Fenêtre minimisée / non focus
     W->>W: PR event détecté
     W->>W: pendingRef.push(event)
-    W->>R: invoke set_tray_tooltip("PR Dashboard — 3 new events")
-    R->>T: tray.set_tooltip(...)
 
-    U->>T: Clic gauche sur l'icône
-    T->>W: window.show() + set_focus()
+    U->>W: Reprend le focus
     W->>W: tauri://focus déclenché
     W->>W: pending.forEach(addToast)
     W->>W: pendingRef = []
-    W->>R: invoke set_tray_tooltip("PR Dashboard")
       </div>
     </div>
 
@@ -893,38 +887,6 @@ sequenceDiagram
   DisplayName = "PR Dashboard"</code></pre>
     <div class="callout callout-amber">
       <p>Cet enregistrement est <strong>idempotent</strong> et ne nécessite pas de droits admin (HKCU). Sans cette clé, <code>tauri-plugin-notification</code> échoue silencieusement et l'app n'apparaît pas dans Paramètres → Notifications.</p>
-    </div>
-  </section>
-
-  <!-- TRAY -->
-  <section id="tray">
-    <h2>System Tray</h2>
-    <p>Configuré dans <code>lib.rs</code> via <code>TrayIconBuilder</code>. La fermeture de la fenêtre via la croix ✕ est interceptée par <code>on_window_event</code> et redirigée vers un <code>window.hide()</code>.</p>
-
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Action utilisateur</th><th>Comportement</th></tr></thead>
-        <tbody>
-          <tr><td>🖱️ Clic gauche sur l'icône tray</td><td>Toggle show/hide de la fenêtre principale</td></tr>
-          <tr><td>Menu → "Show Dashboard"</td><td>Affiche et focus la fenêtre</td></tr>
-          <tr><td>Menu → "Quit"</td><td>Quitte l'application (<code>app.exit(0)</code>)</td></tr>
-          <tr><td>⚡ Bouton Power dans le header</td><td>Quitte l'application (<code>invoke("quit_app")</code>)</td></tr>
-          <tr><td>Clic sur la croix ✕</td><td>Réduit au tray — ne quitte pas (<code>prevent_close()</code>)</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="diagram-wrap">
-      <div class="mermaid">
-stateDiagram-v2
-    [*] --> Visible : Démarrage
-    Visible --> Cachée : Clic ✕ (prevent_close)
-    Visible --> Cachée : Clic tray (si visible)
-    Cachée --> Visible : Clic tray (si cachée)
-    Cachée --> Visible : Menu "Show Dashboard"
-    Visible --> [*] : Menu "Quit" / bouton Power
-    Cachée --> [*] : Menu "Quit"
-      </div>
     </div>
   </section>
 
@@ -990,7 +952,6 @@ stateDiagram-v2
           <tr><td><code>fetch_repo_prs</code></td><td><code>provider, owner, repo, token, baseUrl</code></td><td>GraphQL GitHub ou GitLab → <code>RepoPRs</code></td></tr>
           <tr><td><code>check_pr_merged</code></td><td><code>provider, owner, repo, number, token, baseUrl</code></td><td>REST v3 (GitHub) ou GraphQL (GitLab) → <code>bool</code></td></tr>
           <tr><td><code>open_url</code></td><td><code>url</code></td><td>Ouvre une URL dans le navigateur système</td></tr>
-          <tr><td><code>set_tray_tooltip</code></td><td><code>tooltip</code></td><td>Met à jour le tooltip de l'icône tray</td></tr>
           <tr><td><code>quit_app</code></td><td>—</td><td>Quitte l'application (<code>app.exit(0)</code>)</td></tr>
         </tbody>
       </table>

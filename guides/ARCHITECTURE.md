@@ -12,7 +12,7 @@ Application desktop Tauri 2 + React 19 qui affiche en temps réel les Pull Reque
 | Build frontend | Vite 7 | Dev server (port 1420), bundling |
 | Styles | Tailwind CSS 4 + CSS variables | Utility-first, theming light/dark |
 | Async/Cache | TanStack React Query 5 | Fetching, polling, invalidation |
-| Desktop shell | Tauri 2 (Rust) | Fenêtre native, system tray, commandes |
+| Desktop shell | Tauri 2 (Rust) | Fenêtre native, commandes |
 | HTTP Rust | reqwest 0.12 + tokio | Appels GitHub / GitLab API (async) |
 | Persistance config | tauri-plugin-store | Fichier JSON dans AppData |
 | Notifications | tauri-plugin-notification | Notifications OS natives |
@@ -49,7 +49,7 @@ pr-dashboard/
 │
 └── src-tauri/                    # Backend Rust
     ├── src/
-    │   ├── lib.rs                # Init Tauri : plugins, tray icon, handlers, register_aumid, set_tray_tooltip
+    │   ├── lib.rs                # Init Tauri : plugins, handlers, register_aumid, quit_app
     │   ├── main.rs               # Point d'entrée (délègue à lib.rs)
     │   ├── commands/
     │   │   ├── mod.rs            # Déclaration des modules
@@ -61,8 +61,8 @@ pr-dashboard/
     │       ├── github.rs         # Query GraphQL GitHub + mapping + check_merged (REST v3)
     │       └── gitlab.rs         # Query GraphQL GitLab + mapping + check_merged (GraphQL) + tests
     ├── capabilities/
-    │   └── default.json          # Permissions Tauri (tray, store, notification, opener)
-    ├── icons/                    # Icônes de l'application (utilisée aussi pour le tray)
+    │   └── default.json          # Permissions Tauri (store, notification, opener)
+    ├── icons/                    # Icônes de l'application
     ├── Cargo.toml                # Dépendances Rust
     └── tauri.conf.json           # Config Tauri (nom, fenêtre, bundle)
 ```
@@ -365,21 +365,19 @@ interface PREvent {
 
 **`usePRData`** n'appelle plus directement les APIs de notification — il appelle le callback `onEvent: (e: PREvent) => void` passé par `App.tsx`. Le ref interne stocke désormais `{ title, url }` (au lieu de juste `title`) pour pouvoir inclure l'URL dans les événements de merge.
 
-### Comportement quand la fenêtre est cachée (tray)
+### Comportement quand la fenêtre n'est pas visible
 
 ```
 PR event détecté
-  ├─ fenêtre visible  →  addToast()  →  toast affiché immédiatement
-  └─ fenêtre cachée   →  pendingRef.current.push(event)
-                         invoke("set_tray_tooltip", "PR Dashboard — N new events")
+  ├─ fenêtre visible      →  addToast()  →  toast affiché immédiatement
+  └─ fenêtre non visible  →  pendingRef.current.push(event)
 
-tauri://focus (fenêtre rouverte depuis le tray)
+tauri://focus (fenêtre reprend le focus)
   →  pending.forEach(addToast)   [tous les toasts manqués s'affichent]
   →  pendingRef.current = []
-  →  invoke("set_tray_tooltip", "PR Dashboard")   [tooltip réinitialisé]
 ```
 
-La commande Rust `set_tray_tooltip` retrouve l'icône tray via son ID `"main"` (défini avec `.with_id("main")` dans le builder) et appelle `tray.set_tooltip(...)`.
+Fermer la fenêtre (croix ✕) quitte l'application — il n'y a plus de mise en arrière-plan. Ce chemin ne sert donc que pour le cas où la fenêtre perd le focus sans être fermée (minimisée, autre fenêtre au premier plan).
 
 **Test :** le bouton **Test** dans Settings → Notifications appelle `onTestNotification` (prop fournie par `App.tsx`) qui déclenche un toast ET ajoute une entrée dans l'historique.
 
@@ -445,19 +443,6 @@ Les composants utilisent ces variables via la syntaxe Tailwind arbitraire :
 
 ---
 
-## System Tray
-
-Configuré dans `lib.rs` via `TrayIconBuilder` :
-
-| Action | Comportement |
-|--------|-------------|
-| Clic gauche sur l'icône | Toggle show/hide de la fenêtre principale |
-| Menu → "Show Dashboard" | Affiche et focus la fenêtre |
-| Menu → "Quit" | Quitte l'application |
-| Clic sur la croix ✕ | Réduit au tray (ne quitte pas) grâce à `on_window_event` |
-
----
-
 ## Communication Frontend ↔ Backend
 
 Tauri expose un système de RPC via `invoke()` côté frontend. Les handlers Rust sont enregistrés dans `lib.rs` :
@@ -469,7 +454,7 @@ Tauri expose un système de RPC via `invoke()` côté frontend. Les handlers Rus
 | `fetch_repo_prs` | `provider`, `owner`, `repo`, `token`, `baseUrl` | Appel GraphQL (GitHub ou GitLab), retourne `RepoPRs` |
 | `check_pr_merged` | `provider`, `owner`, `repo`, `number`, `token`, `baseUrl` | REST v3 (GitHub) ou GraphQL (GitLab), retourne `bool` |
 | `open_url` | `url` | Ouvre une URL dans le navigateur système |
-| `set_tray_tooltip` | `tooltip` | Met à jour le tooltip de l'icône tray |
+| `quit_app` | — | Quitte l'application (`app.exit(0)`) |
 
 Les `AppHandle` et injections Tauri sont gérés automatiquement — le frontend ne passe que les paramètres métier.
 
