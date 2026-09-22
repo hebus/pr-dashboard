@@ -119,3 +119,41 @@ export function matchesFilter(pr: PullRequest, filter: FilterStatus): boolean {
   if (filter === "pending") return pr.reviewDecision !== "APPROVED";
   return true;
 }
+
+export type BranchKind = "develop" | "release" | "other";
+
+export function branchKind(branch: string): BranchKind {
+  if (branch === "develop") return "develop";
+  if (/^release\//.test(branch)) return "release";
+  return "other";
+}
+
+function releaseVersionKey(branch: string): number[] {
+  const version = branch.slice("release/".length);
+  return version.split(/[.\-_]/).map((part) => {
+    const n = parseInt(part, 10);
+    return Number.isNaN(n) ? -1 : n;
+  });
+}
+
+const BRANCH_KIND_ORDER: Record<BranchKind, number> = { develop: 0, release: 1, other: 2 };
+
+/** Sorts target branches: develop first, then release/x by version descending, then the rest alphabetically. */
+export function compareBranches(a: string, b: string): number {
+  const kindA = branchKind(a);
+  const kindB = branchKind(b);
+  if (kindA !== kindB) return BRANCH_KIND_ORDER[kindA] - BRANCH_KIND_ORDER[kindB];
+
+  if (kindA === "release") {
+    const versionA = releaseVersionKey(a);
+    const versionB = releaseVersionKey(b);
+    const length = Math.max(versionA.length, versionB.length);
+    for (let i = 0; i < length; i++) {
+      const diff = (versionB[i] ?? 0) - (versionA[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+
+  return a.localeCompare(b);
+}

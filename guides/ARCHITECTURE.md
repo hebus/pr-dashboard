@@ -284,6 +284,16 @@ La condition d'affichage est `isLoading && prs.length === 0` : les squelettes n'
 
 ---
 
+## Groupement par branche cible (`RepoGroup`)
+
+Quand un repo a des PR ouvertes sur plusieurs branches cibles (`baseRefName`) différentes, `RepoGroup` les regroupe en sous-sections au lieu d'une liste plate (comportement inchangé quand une seule branche cible est présente).
+
+- **Classification et tri** (`branchKind()` / `compareBranches()` dans `types/index.ts`) : `develop` toujours en tête, puis les branches `release/x` triées par version décroissante (comparaison numérique segment par segment sur `.`/`-`/`_`), puis les autres branches par ordre alphabétique.
+- **Pastille colorée** par sous-groupe (icône `GitBranch` + nom de branche, `rounded-full`) : indigo (`--c-indigo` / `--c-indigo-bg`) pour `develop`, violet (`--c-violet` / `--c-violet-bg`) pour `release/x`, neutre (`--c-bg-inset` / `--c-text-muted`) pour les autres branches — calculée par `branchBadgeClass()` dans `RepoGroup.tsx`.
+- Ce système est indépendant du fond de carte « approuvée » (`PRCard`, voir plus bas) : chaque `PRCard` garde son propre fond quelle que soit la branche sous laquelle elle est rangée.
+
+---
+
 ## Interactions sur la carte PR (`PRCard`)
 
 | Cible | Action | Comportement |
@@ -440,6 +450,10 @@ Les composants utilisent ces variables via la syntaxe Tailwind arbitraire :
 | `--c-amber-bg` | `#fff8c5` | `#2d2005` | Badge Pending (fond) |
 | `--c-red` | `#cf222e` | `#f85149` | Statut Changes Requested, erreurs |
 | `--c-red-bg` | `#ffebe9` | `#3d1212` | Badge Changes Requested (fond) |
+| `--c-indigo` | `#4f46e5` | `#a5b4fc` | Pastille de branche `develop` |
+| `--c-indigo-bg` | `#eef2ff` | `#1e1b4b` | Pastille de branche `develop` (fond) |
+| `--c-violet` | `#8250df` | `#d8b4fe` | Pastille de branche `release/x` |
+| `--c-violet-bg` | `#fbefff` | `#2e1065` | Pastille de branche `release/x` (fond) |
 
 ---
 

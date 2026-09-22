@@ -35,7 +35,7 @@ function SkeletonCard({ titleW }: { titleW: string }) {
 import { useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type { RepositoryConfig, PullRequest, FilterStatus } from "../types";
-import { matchesFilter, prTerm, repoWebUrl, timeAgo } from "../types";
+import { branchKind, compareBranches, matchesFilter, prTerm, repoWebUrl, timeAgo } from "../types";
 import { PRCard } from "./PRCard";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -81,13 +81,24 @@ export function RepoGroup({
     map.get(pr.baseRefName)!.push(pr);
     return map;
   }, new Map<string, PullRequest[]>());
-  const branchEntries = Array.from(byBranch.entries());
+  const branchEntries = Array.from(byBranch.entries()).sort((a, b) => compareBranches(a[0], b[0]));
 
   const pendingCount  = prs.filter((pr) => pr.reviewDecision !== "APPROVED").length;
   const approvedCount = prs.filter((pr) => pr.reviewDecision === "APPROVED").length;
   const repoLabel     = repo.label ?? `${repo.owner}/${repo.name}`;
   const term          = prTerm(repo.provider);
   const providerName  = repo.provider === "gitlab" ? "GitLab" : "GitHub";
+
+  function branchBadgeClass(branch: string) {
+    const kind = branchKind(branch);
+    if (kind === "develop") {
+      return "bg-[var(--c-indigo-bg)] border border-[var(--c-indigo-border)] text-[var(--c-indigo)]";
+    }
+    if (kind === "release") {
+      return "bg-[var(--c-violet-bg)] border border-[var(--c-violet-border)] text-[var(--c-violet)]";
+    }
+    return "bg-[var(--c-bg-inset)] border border-[var(--c-border)] text-[var(--c-text-muted)]";
+  }
 
   function handleRefresh() {
     queryClient.invalidateQueries({
@@ -188,8 +199,10 @@ export function RepoGroup({
               {branchEntries.map(([branch, bPrs]) => (
                 <div key={branch}>
                   <div className="flex items-center gap-1.5 mb-1.5 px-1">
-                    <GitBranch size={12} className="text-[var(--c-text-subtle)]" />
-                    <span className="text-[11px] font-medium text-[var(--c-text-muted)]">{branch}</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${branchBadgeClass(branch)}`}>
+                      <GitBranch size={11} />
+                      {branch}
+                    </span>
                     <span className="text-[11px] text-[var(--c-text-subtle)]">· {bPrs.length}</span>
                   </div>
                   <div className="flex flex-col gap-2">

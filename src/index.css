@@ -40,6 +40,14 @@ body {
   --c-red:             #cf222e;
   --c-red-bg:          #ffebe9;
   --c-red-border:      #cf222e;
+
+  --c-indigo:          #4f46e5;
+  --c-indigo-bg:       #eef2ff;
+  --c-indigo-border:   #4f46e5;
+
+  --c-violet:          #8250df;
+  --c-violet-bg:       #fbefff;
+  --c-violet-border:   #8250df;
 }
 
 /* ── Dark theme ── */
@@ -72,6 +80,14 @@ body {
   --c-red:             #f85149;
   --c-red-bg:          #3d1212;
   --c-red-border:      #da3633;
+
+  --c-indigo:          #a5b4fc;
+  --c-indigo-bg:       #1e1b4b;
+  --c-indigo-border:   #6366f1;
+
+  --c-violet:          #d8b4fe;
+  --c-violet-bg:       #2e1065;
+  --c-violet-border:   #a855f7;
 }
 
 @keyframes toastProgress {

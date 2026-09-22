@@ -419,6 +419,7 @@
   <a href="#loading">Chargement initial</a>
 
   <div class="section-title">Fonctionnalités</div>
+  <a href="#branch-grouping">Groupement par branche</a>
   <a href="#notifications">Notifications</a>
   <a href="#theming">Theming</a>
 
@@ -823,6 +824,21 @@ interface PREvent {
     </div>
   </section>
 
+  <!-- BRANCH GROUPING -->
+  <section id="branch-grouping">
+    <h2>Groupement par branche cible (<code>RepoGroup</code>)</h2>
+    <p>Quand un repo a des PR ouvertes sur plusieurs branches cibles (<code>baseRefName</code>) différentes, <code>RepoGroup</code> les regroupe en sous-sections au lieu d'une liste plate (comportement inchangé quand une seule branche cible est présente).</p>
+
+    <ul>
+      <li><strong style="color:var(--text)">Classification et tri</strong> (<code>branchKind()</code> / <code>compareBranches()</code> dans <code>types/index.ts</code>) : <code>develop</code> toujours en tête, puis les branches <code>release/x</code> triées par version décroissante (comparaison numérique segment par segment sur <code>.</code>/<code>-</code>/<code>_</code>), puis les autres branches par ordre alphabétique.</li>
+      <li><strong style="color:var(--text)">Pastille colorée</strong> par sous-groupe (icône <code>GitBranch</code> + nom de branche, <code>rounded-full</code>) : indigo (<code>--c-indigo</code> / <code>--c-indigo-bg</code>) pour <code>develop</code>, violet (<code>--c-violet</code> / <code>--c-violet-bg</code>) pour <code>release/x</code>, neutre (<code>--c-bg-inset</code> / <code>--c-text-muted</code>) pour les autres branches — calculée par <code>branchBadgeClass()</code> dans <code>RepoGroup.tsx</code>.</li>
+    </ul>
+
+    <div class="callout callout-green">
+      <p>Ce système est indépendant du fond de carte « approuvée » (<code>PRCard</code>) : chaque <code>PRCard</code> garde son propre fond quelle que soit la branche sous laquelle elle est rangée.</p>
+    </div>
+  </section>
+
   <!-- NOTIFICATIONS -->
   <section id="notifications">
     <h2>Système de notifications</h2>
@@ -932,6 +948,14 @@ sequenceDiagram
       <div class="color-swatch">
         <div class="swatch-preview" style="background:#f85149"></div>
         <div class="swatch-info"><div class="swatch-name">--c-red</div><div class="swatch-values">#f85149 · Changes Requested</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#a5b4fc"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-indigo</div><div class="swatch-values">#a5b4fc · Branche develop</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-preview" style="background:#d8b4fe"></div>
+        <div class="swatch-info"><div class="swatch-name">--c-violet</div><div class="swatch-values">#d8b4fe · Branches release/x</div></div>
       </div>
     </div>
 
