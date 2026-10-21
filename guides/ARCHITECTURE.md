@@ -62,7 +62,9 @@ pr-dashboard/
     │       └── gitlab.rs         # Query GraphQL GitLab + mapping + check_merged (GraphQL) + tests
     ├── capabilities/
     │   └── default.json          # Permissions Tauri (store, notification, opener)
-    ├── icons/                    # Icônes de l'application
+    ├── icons/                    # Icônes générées (ne pas éditer à la main)
+    ├── icons-source/
+    │   └── icon.svg              # Source de l'icône (régénérer : npx tauri icon src-tauri/icons-source/icon.svg)
     ├── Cargo.toml                # Dépendances Rust
     └── tauri.conf.json           # Config Tauri (nom, fenêtre, bundle)
 ```
