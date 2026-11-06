@@ -1,19 +1,42 @@
 name: Release
 
-# Push a tag `vX.Y.Z` (see `npm run bump`) to build, sign and publish a release.
-# The release stays a draft until every platform has uploaded its artifacts, so
-# the updater endpoint (releases/latest/download/latest.json) never serves a
-# half-complete release.
+# Every push to develop runs release-please. It keeps a "release PR" up to date
+# (version bump in package.json, package-lock.json, tauri.conf.json, Cargo.toml and
+# Cargo.lock + CHANGELOG, computed from the conventional commits). Merging that PR
+# makes release-please tag the commit and create the GitHub release; the jobs below
+# then build, sign and attach the installers and `latest.json` to that release.
+#
+# The build jobs live in this same workflow on purpose: a tag created with
+# GITHUB_TOKEN does not trigger other workflows.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - develop
 
 permissions:
   contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   build:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -29,13 +52,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - name: Check tag matches the app version
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$version" != "${{ github.ref_name }}" ]; then
-            echo "Tag ${{ github.ref_name }} does not match tauri.conf.json version $version" >&2
+          if [ "v$version" != "${{ needs.release-please.outputs.tag_name }}" ]; then
+            echo "Tag ${{ needs.release-please.outputs.tag_name }} does not match tauri.conf.json version $version" >&2
             exit 1
           fi
 
@@ -60,24 +85,14 @@ jobs:
 
       - run: npm ci
 
+      # No releaseName/releaseBody: the release already exists (created by
+      # release-please) and keeps its generated changelog as body.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "PR Dashboard ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install. Installed apps update themselves."
-          releaseDraft: true
+          tagName: ${{ needs.release-please.outputs.tag_name }}
           prerelease: false
           args: ${{ matrix.args }}
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
