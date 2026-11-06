@@ -156,7 +156,7 @@ Installed apps check GitHub Releases at startup and every 6 hours, and show a ba
 
 Releases are automated with [release-please](https://github.com/googleapis/release-please). Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`…) and merge into `develop` as usual:
 
-1. A **release PR** ("chore(release): X.Y.Z") is opened and kept up to date. It bumps the version everywhere (`package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`) and writes `CHANGELOG.md`. `fix:` → patch, `feat:` → patch while the version is 0.x, `feat!:` / `BREAKING CHANGE` → minor.
+1. A **release PR** ("chore(release): X.Y.Z") is opened and kept up to date. It bumps the version everywhere (`package.json`, `package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock` — the lockfile is synced by a separate `sync-lockfile` job) and writes `CHANGELOG.md`. Merge feature PRs with **squash** so each change appears once in the changelog. `fix:` → patch, `feat:` → patch while the version is 0.x, `feat!:` / `BREAKING CHANGE` → minor.
 2. **Merge that PR** to release: release-please tags the commit and creates the GitHub release, then the same `Release` workflow builds Windows, macOS (Apple Silicon + Intel) and Linux, signs the updater artifacts and uploads them with `latest.json`.
 
 It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and the repo setting *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*. The installers are not code-signed, so Windows SmartScreen / macOS Gatekeeper warn on first install.
