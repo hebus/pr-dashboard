@@ -27,12 +27,42 @@ jobs:
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
+      prs_created: ${{ steps.rp.outputs.prs_created }}
+      pr: ${{ steps.rp.outputs.pr }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # release-please's TOML updater cannot target a package by name in Cargo.lock
+  # (filters return nothing on its parsed lockfile), so the lockfile is synced here.
+  # Separate job on purpose: a failure here must never block a release build.
+  sync-lockfile:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.prs_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Sync Cargo.lock with the bumped version
+        run: cargo update --workspace --manifest-path src-tauri/Cargo.toml
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- src-tauri/Cargo.lock; then
+            echo "Cargo.lock already in sync"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync Cargo.lock" -- src-tauri/Cargo.lock
+          git push
 
   build:
     needs: release-please
