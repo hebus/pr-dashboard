@@ -36,7 +36,7 @@ export function FilterBar({
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--c-text-muted)]" />
         <input
           type="text"
-          placeholder="Search PRs..."
+          placeholder="Search PRs / MRs..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-8 pr-3 py-1.5 bg-[var(--c-bg)] border border-[var(--c-border)] rounded text-sm text-[var(--c-text)] placeholder-[var(--c-text-subtle)] focus:outline-none focus:border-[var(--c-accent)] transition-colors"
