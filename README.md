@@ -150,6 +150,21 @@ Full architecture details in [ARCHITECTURE.md](./guides/ARCHITECTURE.md).
 
 ---
 
+## Auto-update & releases
+
+Installed apps check GitHub Releases at startup and every 6 hours, and show a banner with an **Install and restart** button when a newer version exists. Nothing is installed without a click.
+
+To publish a release:
+
+```bash
+npm run bump -- 0.2.0
+cargo check --manifest-path src-tauri/Cargo.toml
+git commit -am "chore(release): v0.2.0"
+git tag v0.2.0 && git push origin develop v0.2.0
+```
+
+The `Release` workflow builds Windows, macOS (Apple Silicon + Intel) and Linux, signs the updater artifacts and publishes the release. It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The installers are not code-signed, so Windows SmartScreen / macOS Gatekeeper warn on first install.
+
 ## Windows notification setup
 
 Windows Toast Notifications require the app to be registered in the registry with an **AppUserModelId (AUMID)**. The app handles this automatically at startup — no admin rights needed (written to `HKCU`):

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check } from "lucide-react";
+import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check, CheckCircle2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Provider, PullRequest, ReviewDecision, Reviewer } from "../types";
 import { prPrefix, timeAgo } from "../types";
@@ -171,8 +171,17 @@ export function PRCard({ pr, provider = "github" }: Props) {
             </div>
           </div>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex flex-col items-end gap-1">
           {reviewBadge(pr.reviewDecision, pr.isDraft)}
+          {pr.mergeable === true && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--c-green-bg)] text-[var(--c-green)] border border-[var(--c-green-border)]"
+              title="Nothing blocks the merge"
+            >
+              <CheckCircle2 size={10} />
+              Mergeable
+            </span>
+          )}
         </div>
       </div>
 

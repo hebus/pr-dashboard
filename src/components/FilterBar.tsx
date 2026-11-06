@@ -8,12 +8,14 @@ interface Props {
   onFilterChange: (f: FilterStatus) => void;
   totalPending: number;
   totalApproved: number;
+  totalMergeable: number;
 }
 
 const FILTERS: { key: FilterStatus; label: string }[] = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
+  { key: "mergeable", label: "Mergeable" },
 ];
 
 export function FilterBar({
@@ -23,6 +25,7 @@ export function FilterBar({
   onFilterChange,
   totalPending,
   totalApproved,
+  totalMergeable,
 }: Props) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--c-border)] bg-[var(--c-bg-subtle)]">
@@ -57,6 +60,11 @@ export function FilterBar({
             {key === "approved" && totalApproved > 0 && (
               <span className="ml-1.5 px-1.5 py-0.5 bg-[var(--c-green-btn)] text-white rounded-full text-[10px] font-bold">
                 {totalApproved}
+              </span>
+            )}
+            {key === "mergeable" && totalMergeable > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 bg-[var(--c-green-btn)] text-white rounded-full text-[10px] font-bold">
+                {totalMergeable}
               </span>
             )}
           </button>

@@ -73,6 +73,7 @@ struct GqlPR {
     head_ref_name: String,
     base_ref_name: String,
     review_decision: Option<String>,
+    merge_state_status: Option<String>,
     author: Option<GqlUser>,
     labels: GqlLabelConn,
     reviews: GqlReviewConn,
@@ -96,6 +97,7 @@ query GetOpenPRs($owner: String!, $repo: String!, $first: Int!) {
         headRefName
         baseRefName
         reviewDecision
+        mergeStateStatus
         author { login avatarUrl }
         labels(first: 10) { nodes { name color } }
         reviews(last: 20) {
@@ -157,6 +159,17 @@ pub async fn fetch_prs(
         .unwrap_or_default())
 }
 
+/// CLEAN and HAS_HOOKS can be merged right now. UNKNOWN means GitHub is still
+/// computing; BEHIND, BLOCKED, DIRTY, DRAFT and UNSTABLE are all blockers
+/// (UNSTABLE = failing, non-required checks: mergeable on paper, but not "green").
+fn mergeable_from_state(state: Option<&str>) -> Option<bool> {
+    match state? {
+        "CLEAN" | "HAS_HOOKS" => Some(true),
+        "UNKNOWN" => None,
+        _ => Some(false),
+    }
+}
+
 fn map_pr(pr: GqlPR) -> PullRequest {
     let approvers: Vec<Reviewer> = pr
         .reviews
@@ -180,6 +193,7 @@ fn map_pr(pr: GqlPR) -> PullRequest {
         head_ref_name: pr.head_ref_name,
         base_ref_name: pr.base_ref_name,
         review_decision: pr.review_decision,
+        mergeable: mergeable_from_state(pr.merge_state_status.as_deref()),
         author: pr
             .author
             .map(|a| Reviewer {
@@ -237,4 +251,20 @@ pub async fn check_merged(
 
     let pr: RestPR = resp.json().await.map_err(|e| e.to_string())?;
     Ok(pr.state == "closed" && pr.merged_at.is_some())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_state_maps_to_tri_state() {
+        assert_eq!(mergeable_from_state(Some("CLEAN")), Some(true));
+        assert_eq!(mergeable_from_state(Some("HAS_HOOKS")), Some(true));
+        for s in ["BEHIND", "BLOCKED", "DIRTY", "DRAFT", "UNSTABLE"] {
+            assert_eq!(mergeable_from_state(Some(s)), Some(false), "{s}");
+        }
+        assert_eq!(mergeable_from_state(Some("UNKNOWN")), None);
+        assert_eq!(mergeable_from_state(None), None);
+    }
 }

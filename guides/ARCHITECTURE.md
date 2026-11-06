@@ -33,10 +33,12 @@ pr-dashboard/
 │   │   ├── useConfig.ts          # Chargement/sauvegarde config via Tauri
 │   │   ├── usePRData.ts          # Polling GitHub + émission d'événements PREvent
 │   │   ├── useToast.ts           # Gestion de la queue de toasts (state + auto-dismiss 5s)
-│   │   └── useNotifications.ts   # Historique persistant des notifications (markRead, remove…)
+│   │   ├── useNotifications.ts   # Historique persistant des notifications (markRead, remove…)
+│   │   └── useUpdater.ts         # Vérification des mises à jour (GitHub Releases) + installation
 │   ├── components/
 │   │   ├── ErrorBoundary.tsx     # Capture les erreurs React
-│   │   ├── FilterBar.tsx         # Barre recherche + toggle All/Pending/Approved
+│   │   ├── UpdateBanner.tsx      # Bannière « nouvelle version disponible » (installer / plus tard)
+│   │   ├── FilterBar.tsx         # Barre recherche + toggle All/Pending/Approved/Mergeable
 │   │   ├── ProviderIcon.tsx      # Logos GitHub / GitLab en SVG inline (lucide n'a plus d'icônes de marque)
 │   │   ├── RepoGroup.tsx         # Groupe collapsible par repository (avec squelettes au premier chargement)
 │   │   ├── PRCard.tsx            # Carte d'une PR/MR (nom de branche cliquable → copie clipboard)
@@ -160,6 +162,7 @@ query GetOpenPRs($owner, $repo, $first: 50) {
         createdAt, updatedAt
         headRefName, baseRefName
         reviewDecision          ← APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+        mergeStateStatus        ← CLEAN | HAS_HOOKS | UNKNOWN | BEHIND | BLOCKED | DIRTY | DRAFT | UNSTABLE
         author { login, avatarUrl }
         labels { name, color }
         reviews(last: 20) { state, author }   ← pour extraire les approbateurs
@@ -170,6 +173,8 @@ query GetOpenPRs($owner, $repo, $first: 50) {
 ```
 
 `reviewDecision` est calculé par GitHub et reflète la décision agrégée de review.
+
+`mergeStateStatus` alimente `mergeable` (`github.rs::mergeable_from_state`) : `CLEAN` / `HAS_HOOKS` → `true` ; `UNKNOWN` (calcul en cours) → `null` ; tout le reste → `false`. `UNSTABLE` (checks non requis en échec) est volontairement traité comme bloquant : « fusionnable » signifie « au vert ». Ce champ n'existe que sur les GHES récents : sur une version plus ancienne, une erreur de champ GraphQL fera échouer la query du repo (voir la note GHES ci-dessous).
 
 > **Note GHES :** Le champ `requestedReviewers` n'est pas disponible sur toutes les versions de GitHub Enterprise Server. Il a été retiré de la query pour éviter une erreur GraphQL bloquante. Le champ `requestedReviewers` dans les types TypeScript et Rust est conservé mais retourne toujours un tableau vide.
 
@@ -196,6 +201,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
       nodes {
         iid title webUrl draft createdAt updatedAt
         sourceBranch targetBranch approved
+        detailedMergeStatus
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -227,6 +233,8 @@ Particularités du schéma GitLab :
 
 `reviewDecision` est dérivé dans cet ordre : un reviewer en `REQUESTED_CHANGES` → `CHANGES_REQUESTED` ; sinon `approved` → `APPROVED` ; sinon `REVIEW_REQUIRED`.
 
+`mergeable` est dérivé de `detailedMergeStatus` (`gitlab.rs::mergeable_from_status`) : `MERGEABLE` → `true` ; `CHECKING` / `UNCHECKED` / `PREPARING` (GitLab calcule le statut de façon asynchrone, notamment juste après un push) → `null` ; tout le reste (`CONFLICT`, `CI_MUST_PASS`, `NOT_APPROVED`, `DRAFT_STATUS`, `DISCUSSIONS_NOT_RESOLVED`, `NEED_REBASE`…) → `false`.
+
 > `approved` signifie « **toutes** les approbations requises sont obtenues ». Une MR approuvée 1 fois sur 2 reste `REVIEW_REQUIRED` tout en exposant ses `approvers` → elle prend le fond « partiellement approuvée », exactement comme sur GitHub. Ne pas dériver `APPROVED` d'un `approvedBy` non vide.
 
 ### GraphQL GitLab (check_pr_merged)
@@ -255,6 +263,7 @@ interface PullRequest {
   headRefName: string;        // branche source
   baseRefName: string;        // branche cible
   reviewDecision: ReviewDecision;
+  mergeable: boolean | null;       // true: fusionnable · false: bloquée · null: statut pas encore calculé
   author: Reviewer;
   labels: Label[];
   requestedReviewers: Reviewer[];  // toujours vide (non supporté sur GHES, voir note)
@@ -308,6 +317,10 @@ Le nom de branche est rendu comme un `<button>` :
 - Une icône `Copy` (lucide) apparaît au survol de la carte (`opacity-0 group-hover:opacity-60`) ; après copie elle bascule en `Check` vert pendant 1,5 s via un état local `copied` (`setTimeout`).
 - Le `title` reflète l'état : `Copy "<branche>"` ou `Copied!`.
 - `navigator.clipboard` est disponible dans la WebView2 (Tauri) ; l'appel est protégé par un `try/catch` silencieux si l'API est indisponible.
+
+### Badge et filtre « Mergeable »
+
+`mergeable` est tri-état et commun aux deux sources. Seul `true` produit un effet : badge vert `Mergeable` (icône `CheckCircle2`) sous le badge de review dans `PRCard`, et filtre `mergeable` dans `FilterBar` (`matchesFilter` : `pr.mergeable === true`) avec son compteur (`totalMergeable`, calculé dans `App.tsx`). `false` et `null` ne s'affichent pas : une MR dont le statut est encore en cours de calcul n'est jamais présentée comme bloquée.
 
 ---
 
@@ -483,6 +496,42 @@ Les `AppHandle` et injections Tauri sont gérés automatiquement — le frontend
 - L'invalidation manuelle (bouton refresh) appelle `queryClient.invalidateQueries()`
 - Les queries sont désactivées (`enabled: false`) si le token **de la source du repo** est vide
 - Le backend fait l'appel HTTP en Rust avec un timeout de 15s
+
+---
+
+## Mise à jour automatique
+
+L'app vérifie GitHub Releases au démarrage (après 5 s) puis toutes les 6 h. Rien n'est téléchargé tant que l'utilisateur n'a pas cliqué sur **Install and restart**.
+
+| Élément | Rôle |
+|---------|------|
+| `tauri-plugin-updater` + `tauri-plugin-process` | Vérification/installation de la mise à jour, puis `relaunch()`. Permissions `updater:default` et `process:allow-restart` dans `capabilities/default.json` |
+| `hooks/useUpdater.ts` | `check()` planifié, état `idle → available → installing → error`, progression du téléchargement. Plugins importés dynamiquement : inerte dans `npm run dev` hors webview |
+| `components/UpdateBanner.tsx` | Bannière sous le header : « Version X disponible », bouton d'installation, croix « Later » (rouverte si une version plus récente sort) |
+| `plugins.updater` (`tauri.conf.json`) | `pubkey` + endpoint `https://github.com/hebus/pr-dashboard/releases/latest/download/latest.json` ; `installMode: passive` sous Windows |
+| `bundle.createUpdaterArtifacts` | Produit les `.sig` à côté des installeurs |
+
+Une erreur de vérification (hors-ligne, pas encore de release…) est ignorée silencieusement (`console.warn`) ; seule une erreur d'installation s'affiche.
+
+### Signature
+
+Tauri refuse tout binaire non signé avec la clé correspondant à `pubkey`. La paire a été générée avec `npm run tauri signer generate`.
+- **Clé publique** : dans `tauri.conf.json`.
+- **Clé privée** : secrets GitHub `TAURI_SIGNING_PRIVATE_KEY` (+ `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, vide si la clé n'a pas de mot de passe). **À sauvegarder** : sans elle, les installations existantes ne pourront plus jamais se mettre à jour.
+- Cette signature n'est pas une signature de code : sans certificat, Windows SmartScreen et macOS Gatekeeper avertissent à la première installation.
+
+### Publier une release
+
+```
+npm run bump -- 0.2.0                          # package.json, package-lock.json, tauri.conf.json, Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml   # met à jour Cargo.lock
+git commit -am "chore(release): v0.2.0"
+git tag v0.2.0 && git push origin develop v0.2.0
+```
+
+`.github/workflows/release.yml` se déclenche sur le tag `v*` : il vérifie que le tag correspond à la version de `tauri.conf.json`, construit Windows, macOS (arm64 + x64) et Linux avec `tauri-action`, signe, crée la release en **brouillon**, puis un job `publish` la publie quand toutes les plateformes ont terminé (l'endpoint `latest.json` ne sert donc jamais une release incomplète).
+
+L'updater compare la version installée à `latest.json` : chaque release doit avoir une version strictement supérieure.
 
 ---
 
