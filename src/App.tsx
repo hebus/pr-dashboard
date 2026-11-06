@@ -16,11 +16,13 @@ import { useConfig } from "./hooks/useConfig";
 import { usePRData } from "./hooks/usePRData";
 import { useToast } from "./hooks/useToast";
 import { useNotifications } from "./hooks/useNotifications";
+import { useUpdater } from "./hooks/useUpdater";
 import { FilterBar } from "./components/FilterBar";
 import { RepoGroup } from "./components/RepoGroup";
 import { Settings } from "./components/Settings";
 import { ToastContainer } from "./components/ToastContainer";
 import { NotificationPanel } from "./components/NotificationPanel";
+import { UpdateBanner } from "./components/UpdateBanner";
 import type { FilterStatus, PREvent } from "./types";
 import { providerCreds } from "./types";
 
@@ -38,6 +40,7 @@ export default function App() {
 
   const { config, loading, saveConfig } = useConfig();
   const queryClient = useQueryClient();
+  const updater = useUpdater();
   const { toasts, addToast, dismissToast } = useToast();
   const { notifications, addNotification, markRead, markAllRead, remove, unreadCount } =
     useNotifications();
@@ -90,17 +93,19 @@ export default function App() {
     ),
   );
 
-  const { totalPending, totalApproved } = useMemo(() => {
+  const { totalPending, totalApproved, totalMergeable } = useMemo(() => {
     let pending = 0;
     let approved = 0;
+    let mergeable = 0;
     queries.forEach((q) => {
       if (!q.data) return;
       q.data.prs.forEach((pr) => {
         if (pr.reviewDecision === "APPROVED") approved++;
         else pending++;
+        if (pr.mergeable === true) mergeable++;
       });
     });
-    return { totalPending: pending, totalApproved: approved };
+    return { totalPending: pending, totalApproved: approved, totalMergeable: mergeable };
   }, [queries]);
 
   function refreshAll() {
@@ -193,6 +198,17 @@ export default function App() {
         </div>
       </header>
 
+      {!updater.dismissed && (
+        <UpdateBanner
+          status={updater.status}
+          version={updater.version}
+          progress={updater.progress}
+          error={updater.error}
+          onInstall={updater.install}
+          onDismiss={updater.dismiss}
+        />
+      )}
+
       {!hasToken || !hasRepos ? (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center px-8">
           <GitPullRequest size={40} className="text-[var(--c-border)]" />
@@ -225,6 +241,7 @@ export default function App() {
             onFilterChange={setFilter}
             totalPending={totalPending}
             totalApproved={totalApproved}
+            totalMergeable={totalMergeable}
           />
           <main className="flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-3 max-w-4xl mx-auto">

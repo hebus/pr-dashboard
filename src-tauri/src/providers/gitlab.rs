@@ -69,6 +69,8 @@ struct GqlMr {
     target_branch: String,
     #[serde(default)]
     approved: bool,
+    /// Computed asynchronously by GitLab: CHECKING / UNCHECKED right after a push.
+    detailed_merge_status: Option<String>,
     author: Option<GqlUser>,
     labels: Option<Conn<GqlLabel>>,
     approved_by: Option<Conn<GqlUser>>,
@@ -110,6 +112,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
         sourceBranch
         targetBranch
         approved
+        detailedMergeStatus
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -232,6 +235,18 @@ fn user_nodes(conn: &Option<Conn<GqlUser>>) -> &[GqlUser] {
     conn.as_ref().map(|c| c.nodes.as_slice()).unwrap_or(&[])
 }
 
+/// `MERGEABLE` is the only status meaning "nothing blocks the merge". The
+/// statuses below are transient (GitLab is still computing), so they map to
+/// unknown rather than to "blocked". Everything else (CONFLICT, CI_MUST_PASS,
+/// NOT_APPROVED, DRAFT_STATUS, DISCUSSIONS_NOT_RESOLVED…) is a real blocker.
+fn mergeable_from_status(status: Option<&str>) -> Option<bool> {
+    match status? {
+        "MERGEABLE" => Some(true),
+        "CHECKING" | "UNCHECKED" | "PREPARING" => None,
+        _ => Some(false),
+    }
+}
+
 fn map_mr(base_url: &str, mr: GqlMr) -> Option<PullRequest> {
     // `iid` is a String in the GitLab schema. Drop the MR rather than coercing
     // to 0: the frontend keys its new/merged diff map by `number`.
@@ -272,6 +287,7 @@ fn map_mr(base_url: &str, mr: GqlMr) -> Option<PullRequest> {
         head_ref_name: mr.source_branch,
         base_ref_name: mr.target_branch,
         review_decision,
+        mergeable: mergeable_from_status(mr.detailed_merge_status.as_deref()),
         author: mr
             .author
             .as_ref()
@@ -404,6 +420,33 @@ mod tests {
         assert!(pr.labels.is_empty());
         assert!(pr.approvers.is_empty());
         assert!(pr.requested_reviewers.is_empty());
+    }
+
+    #[test]
+    fn mergeable_only_when_status_is_mergeable() {
+        let mut json = fixture();
+        json["detailedMergeStatus"] = serde_json::json!("MERGEABLE");
+        assert_eq!(mr_from(json).unwrap().mergeable, Some(true));
+    }
+
+    #[test]
+    fn blockers_are_not_mergeable() {
+        for status in ["CONFLICT", "CI_MUST_PASS", "NOT_APPROVED", "DRAFT_STATUS", "NEED_REBASE"] {
+            let mut json = fixture();
+            json["detailedMergeStatus"] = serde_json::json!(status);
+            assert_eq!(mr_from(json).unwrap().mergeable, Some(false), "{status}");
+        }
+    }
+
+    #[test]
+    fn transient_or_missing_status_is_unknown() {
+        for status in ["CHECKING", "UNCHECKED", "PREPARING"] {
+            let mut json = fixture();
+            json["detailedMergeStatus"] = serde_json::json!(status);
+            assert_eq!(mr_from(json).unwrap().mergeable, None, "{status}");
+        }
+        // Field absent from the fixture → unknown, not blocked.
+        assert_eq!(mr_from(fixture()).unwrap().mergeable, None);
     }
 
     #[test]

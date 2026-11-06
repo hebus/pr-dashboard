@@ -46,6 +46,10 @@ pub struct PullRequest {
     pub head_ref_name: String,
     pub base_ref_name: String,
     pub review_decision: Option<String>,
+    /// `Some(true)`: nothing blocks the merge. `Some(false)`: blocked (conflicts,
+    /// failing pipeline, missing approvals, draft…). `None`: the host has not
+    /// finished computing it yet, so the UI must not claim either way.
+    pub mergeable: Option<bool>,
     pub author: Reviewer,
     pub labels: Vec<Label>,
     pub requested_reviewers: Vec<Reviewer>,
