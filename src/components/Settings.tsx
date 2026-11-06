@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Plus, Trash2, Eye, EyeOff, GitPullRequest, Bell, CheckCircle } from "lucide-react";
 import type { Config, Provider, RepositoryConfig } from "../types";
 import { generateId } from "../types";
@@ -154,6 +154,16 @@ function SourceSection({
 }
 
 export function Settings({ config, onSave, onClose, onTestNotification }: Props) {
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  // Lazy import: there is no Tauri runtime in a plain browser (`npm run dev`).
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    import("@tauri-apps/api/app")
+      .then((app) => app.getVersion())
+      .then(setAppVersion)
+      .catch(() => {});
+  }, []);
   const [local, setLocal]         = useState<Config>(config);
   const [saving, setSaving]       = useState(false);
   const [notifSent, setNotifSent] = useState(false);
@@ -205,6 +215,9 @@ export function Settings({ config, onSave, onClose, onTestNotification }: Props)
           <div className="flex items-center gap-2">
             <GitPullRequest size={16} className="text-[var(--c-text)]" />
             <h2 className="font-semibold text-[var(--c-text)]">Settings</h2>
+            {appVersion && (
+              <span className="text-xs text-[var(--c-text-muted)] font-mono">v{appVersion}</span>
+            )}
           </div>
           <button
             onClick={onClose}
