@@ -71,7 +71,6 @@ jobs:
           releaseBody: "See the assets below to download and install. Installed apps update themselves."
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
           args: ${{ matrix.args }}
 
   publish:
