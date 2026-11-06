@@ -71,6 +71,10 @@ struct GqlMr {
     approved: bool,
     /// Computed asynchronously by GitLab: CHECKING / UNCHECKED right after a push.
     detailed_merge_status: Option<String>,
+    /// Preferred over `detailedMergeStatus == CONFLICT`: that status exposes a
+    /// single blocker, so another one (e.g. a failing pipeline) can mask a conflict.
+    #[serde(default)]
+    conflicts: bool,
     author: Option<GqlUser>,
     labels: Option<Conn<GqlLabel>>,
     approved_by: Option<Conn<GqlUser>>,
@@ -113,6 +117,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
         targetBranch
         approved
         detailedMergeStatus
+        conflicts
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -288,6 +293,7 @@ fn map_mr(base_url: &str, mr: GqlMr) -> Option<PullRequest> {
         base_ref_name: mr.target_branch,
         review_decision,
         mergeable: mergeable_from_status(mr.detailed_merge_status.as_deref()),
+        has_conflicts: mr.conflicts || mr.detailed_merge_status.as_deref() == Some("CONFLICT"),
         author: mr
             .author
             .as_ref()
@@ -436,6 +442,26 @@ mod tests {
             json["detailedMergeStatus"] = serde_json::json!(status);
             assert_eq!(mr_from(json).unwrap().mergeable, Some(false), "{status}");
         }
+    }
+
+    #[test]
+    fn conflicts_flag_is_reported_even_when_another_blocker_is_shown() {
+        let mut json = fixture();
+        json["detailedMergeStatus"] = serde_json::json!("CI_MUST_PASS");
+        json["conflicts"] = serde_json::json!(true);
+        assert!(mr_from(json).unwrap().has_conflicts);
+    }
+
+    #[test]
+    fn conflict_status_alone_also_counts() {
+        let mut json = fixture();
+        json["detailedMergeStatus"] = serde_json::json!("CONFLICT");
+        assert!(mr_from(json).unwrap().has_conflicts);
+    }
+
+    #[test]
+    fn no_conflicts_by_default() {
+        assert!(!mr_from(fixture()).unwrap().has_conflicts);
     }
 
     #[test]

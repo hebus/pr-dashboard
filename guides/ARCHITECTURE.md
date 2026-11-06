@@ -174,7 +174,7 @@ query GetOpenPRs($owner, $repo, $first: 50) {
 
 `reviewDecision` est calculé par GitHub et reflète la décision agrégée de review.
 
-`mergeStateStatus` alimente `mergeable` (`github.rs::mergeable_from_state`) : `CLEAN` / `HAS_HOOKS` → `true` ; `UNKNOWN` (calcul en cours) → `null` ; tout le reste → `false`. `UNSTABLE` (checks non requis en échec) est volontairement traité comme bloquant : « fusionnable » signifie « au vert ». Ce champ n'existe que sur les GHES récents : sur une version plus ancienne, une erreur de champ GraphQL fera échouer la query du repo (voir la note GHES ci-dessous).
+`mergeStateStatus` alimente aussi `hasConflicts` (`DIRTY` → `true`, voir « Badge et filtre « Conflicts » »). Il alimente `mergeable` (`github.rs::mergeable_from_state`) : `CLEAN` / `HAS_HOOKS` → `true` ; `UNKNOWN` (calcul en cours) → `null` ; tout le reste → `false`. `UNSTABLE` (checks non requis en échec) est volontairement traité comme bloquant : « fusionnable » signifie « au vert ». Ce champ n'existe que sur les GHES récents : sur une version plus ancienne, une erreur de champ GraphQL fera échouer la query du repo (voir la note GHES ci-dessous).
 
 > **Note GHES :** Le champ `requestedReviewers` n'est pas disponible sur toutes les versions de GitHub Enterprise Server. Il a été retiré de la query pour éviter une erreur GraphQL bloquante. Le champ `requestedReviewers` dans les types TypeScript et Rust est conservé mais retourne toujours un tableau vide.
 
@@ -202,6 +202,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
         iid title webUrl draft createdAt updatedAt
         sourceBranch targetBranch approved
         detailedMergeStatus
+        conflicts
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -235,6 +236,8 @@ Particularités du schéma GitLab :
 
 `mergeable` est dérivé de `detailedMergeStatus` (`gitlab.rs::mergeable_from_status`) : `MERGEABLE` → `true` ; `CHECKING` / `UNCHECKED` / `PREPARING` (GitLab calcule le statut de façon asynchrone, notamment juste après un push) → `null` ; tout le reste (`CONFLICT`, `CI_MUST_PASS`, `NOT_APPROVED`, `DRAFT_STATUS`, `DISCUSSIONS_NOT_RESOLVED`, `NEED_REBASE`…) → `false`.
 
+`hasConflicts` vaut `conflicts || detailedMergeStatus == "CONFLICT"` (`gitlab.rs::map_mr`). Le booléen `conflicts` est prioritaire : `detailedMergeStatus` n'expose qu'**un seul** bloqueur à la fois, donc un pipeline en échec peut masquer un conflit.
+
 > `approved` signifie « **toutes** les approbations requises sont obtenues ». Une MR approuvée 1 fois sur 2 reste `REVIEW_REQUIRED` tout en exposant ses `approvers` → elle prend le fond « partiellement approuvée », exactement comme sur GitHub. Ne pas dériver `APPROVED` d'un `approvedBy` non vide.
 
 ### GraphQL GitLab (check_pr_merged)
@@ -264,6 +267,7 @@ interface PullRequest {
   baseRefName: string;        // branche cible
   reviewDecision: ReviewDecision;
   mergeable: boolean | null;       // true: fusionnable · false: bloquée · null: statut pas encore calculé
+  hasConflicts: boolean;           // conflits avec la branche cible (GitLab `conflicts`, GitHub `DIRTY`)
   author: Reviewer;
   labels: Label[];
   requestedReviewers: Reviewer[];  // toujours vide (non supporté sur GHES, voir note)
@@ -321,6 +325,10 @@ Le nom de branche est rendu comme un `<button>` :
 ### Badge et filtre « Mergeable »
 
 `mergeable` est tri-état et commun aux deux sources. Seul `true` produit un effet : badge vert `Mergeable` (icône `CheckCircle2`) sous le badge de review dans `PRCard`, et filtre `mergeable` dans `FilterBar` (`matchesFilter` : `pr.mergeable === true`) avec son compteur (`totalMergeable`, calculé dans `App.tsx`). `false` et `null` ne s'affichent pas : une MR dont le statut est encore en cours de calcul n'est jamais présentée comme bloquée.
+
+### Badge et filtre « Conflicts »
+
+`hasConflicts` est un booléen commun aux deux sources, indépendant de `mergeable` (une PR en conflit a toujours `mergeable === false`, mais l'inverse est faux). `true` affiche un badge rouge `Conflicts` (icône `AlertTriangle`) sous le badge de review dans `PRCard`, au-dessus du badge `Mergeable` qui ne peut pas coexister avec lui, et active le filtre `conflicts` de `FilterBar` (`matchesFilter` : `pr.hasConflicts`) avec son compteur rouge (`totalConflicts`, calculé dans `App.tsx`). GitLab calcule les conflits de façon asynchrone : juste après un push, `conflicts` peut être temporairement périmé.
 
 ---
 

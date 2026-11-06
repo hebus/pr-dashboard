@@ -93,19 +93,26 @@ export default function App() {
     ),
   );
 
-  const { totalPending, totalApproved, totalMergeable } = useMemo(() => {
+  const { totalPending, totalApproved, totalMergeable, totalConflicts } = useMemo(() => {
     let pending = 0;
     let approved = 0;
     let mergeable = 0;
+    let conflicts = 0;
     queries.forEach((q) => {
       if (!q.data) return;
       q.data.prs.forEach((pr) => {
         if (pr.reviewDecision === "APPROVED") approved++;
         else pending++;
         if (pr.mergeable === true) mergeable++;
+        if (pr.hasConflicts) conflicts++;
       });
     });
-    return { totalPending: pending, totalApproved: approved, totalMergeable: mergeable };
+    return {
+      totalPending: pending,
+      totalApproved: approved,
+      totalMergeable: mergeable,
+      totalConflicts: conflicts,
+    };
   }, [queries]);
 
   function refreshAll() {
@@ -242,6 +249,7 @@ export default function App() {
             totalPending={totalPending}
             totalApproved={totalApproved}
             totalMergeable={totalMergeable}
+            totalConflicts={totalConflicts}
           />
           <main className="flex-1 overflow-y-auto p-4">
             <div className="flex flex-col gap-3 max-w-4xl mx-auto">

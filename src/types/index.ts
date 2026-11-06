@@ -69,6 +69,8 @@ export interface PullRequest {
   reviewDecision: ReviewDecision;
   /** true: can be merged now · false: blocked · null: host still computing it. */
   mergeable: boolean | null;
+  /** The branch has conflicts with its target (GitLab `conflicts`, GitHub `DIRTY`). */
+  hasConflicts: boolean;
   author: Reviewer;
   labels: Label[];
   requestedReviewers: Reviewer[];
@@ -82,7 +84,7 @@ export interface RepoPRs {
   lastUpdated: string | null;
 }
 
-export type FilterStatus = "all" | "pending" | "approved" | "mergeable";
+export type FilterStatus = "all" | "pending" | "approved" | "mergeable" | "conflicts";
 
 export interface PREvent {
   type: "new_pr" | "merged";
@@ -120,6 +122,7 @@ export function matchesFilter(pr: PullRequest, filter: FilterStatus): boolean {
   if (filter === "approved") return pr.reviewDecision === "APPROVED";
   if (filter === "pending") return pr.reviewDecision !== "APPROVED";
   if (filter === "mergeable") return pr.mergeable === true;
+  if (filter === "conflicts") return pr.hasConflicts;
   return true;
 }
 
