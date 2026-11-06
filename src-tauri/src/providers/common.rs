@@ -50,6 +50,11 @@ pub struct PullRequest {
     /// failing pipeline, missing approvals, draft…). `None`: the host has not
     /// finished computing it yet, so the UI must not claim either way.
     pub mergeable: Option<bool>,
+    /// The branch cannot be merged into its target as-is because of conflicts.
+    /// Independent from `mergeable`: a conflicted PR is always `mergeable == false`,
+    /// but GitLab reports only one blocker in `detailedMergeStatus`, so a failing
+    /// pipeline can hide a conflict there.
+    pub has_conflicts: bool,
     pub author: Reviewer,
     pub labels: Vec<Label>,
     pub requested_reviewers: Vec<Reviewer>,

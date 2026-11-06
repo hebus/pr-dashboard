@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check, CheckCircle2 } from "lucide-react";
+import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check, CheckCircle2, AlertTriangle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Provider, PullRequest, ReviewDecision, Reviewer } from "../types";
 import { prPrefix, timeAgo } from "../types";
@@ -173,6 +173,15 @@ export function PRCard({ pr, provider = "github" }: Props) {
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
           {reviewBadge(pr.reviewDecision, pr.isDraft)}
+          {pr.hasConflicts && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--c-red-bg)] text-[var(--c-red)] border border-[var(--c-red-border)]"
+              title="Conflicts with the target branch"
+            >
+              <AlertTriangle size={10} />
+              Conflicts
+            </span>
+          )}
           {pr.mergeable === true && (
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--c-green-bg)] text-[var(--c-green)] border border-[var(--c-green-border)]"

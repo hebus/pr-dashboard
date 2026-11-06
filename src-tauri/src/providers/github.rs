@@ -194,6 +194,8 @@ fn map_pr(pr: GqlPR) -> PullRequest {
         base_ref_name: pr.base_ref_name,
         review_decision: pr.review_decision,
         mergeable: mergeable_from_state(pr.merge_state_status.as_deref()),
+        // DIRTY = the merge commit cannot be created cleanly (conflicts).
+        has_conflicts: pr.merge_state_status.as_deref() == Some("DIRTY"),
         author: pr
             .author
             .map(|a| Reviewer {
@@ -266,5 +268,27 @@ mod tests {
         }
         assert_eq!(mergeable_from_state(Some("UNKNOWN")), None);
         assert_eq!(mergeable_from_state(None), None);
+    }
+
+    fn pr_with_state(state: serde_json::Value) -> PullRequest {
+        map_pr(
+            serde_json::from_value::<GqlPR>(serde_json::json!({
+                "number": 1, "title": "t", "url": "u",
+                "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z",
+                "headRefName": "feat", "baseRefName": "develop",
+                "reviewDecision": null, "mergeStateStatus": state, "author": null,
+                "labels": { "nodes": [] }, "reviews": { "nodes": [] }
+            }))
+            .expect("fixture must parse"),
+        )
+    }
+
+    #[test]
+    fn dirty_state_means_conflicts() {
+        assert!(pr_with_state(serde_json::json!("DIRTY")).has_conflicts);
+        for s in ["CLEAN", "BLOCKED", "BEHIND", "UNKNOWN"] {
+            assert!(!pr_with_state(serde_json::json!(s)).has_conflicts, "{s}");
+        }
+        assert!(!pr_with_state(serde_json::Value::Null).has_conflicts);
     }
 }

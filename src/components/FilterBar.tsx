@@ -9,6 +9,7 @@ interface Props {
   totalPending: number;
   totalApproved: number;
   totalMergeable: number;
+  totalConflicts: number;
 }
 
 const FILTERS: { key: FilterStatus; label: string }[] = [
@@ -16,6 +17,7 @@ const FILTERS: { key: FilterStatus; label: string }[] = [
   { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
   { key: "mergeable", label: "Mergeable" },
+  { key: "conflicts", label: "Conflicts" },
 ];
 
 export function FilterBar({
@@ -26,6 +28,7 @@ export function FilterBar({
   totalPending,
   totalApproved,
   totalMergeable,
+  totalConflicts,
 }: Props) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--c-border)] bg-[var(--c-bg-subtle)]">
@@ -65,6 +68,11 @@ export function FilterBar({
             {key === "mergeable" && totalMergeable > 0 && (
               <span className="ml-1.5 px-1.5 py-0.5 bg-[var(--c-green-btn)] text-white rounded-full text-[10px] font-bold">
                 {totalMergeable}
+              </span>
+            )}
+            {key === "conflicts" && totalConflicts > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 bg-[var(--c-red)] text-white rounded-full text-[10px] font-bold">
+                {totalConflicts}
               </span>
             )}
           </button>
