@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/hebus/pr-dashboard/compare/v0.1.5...v0.1.6) (2026-11-07)
+
+
+### Features
+
+* **ui:** show a badge when the latest pipeline failed ([035784a](https://github.com/hebus/pr-dashboard/commit/035784a68e36649f518a7a530b1583c15716d267))
+* **ui:** show a badge when the latest pipeline failed ([29b048d](https://github.com/hebus/pr-dashboard/commit/29b048dbcebb6a5222b938652f98747f0b212f82))
+
 ## [0.1.5](https://github.com/hebus/pr-dashboard/compare/v0.1.4...v0.1.5) (2026-11-06)
 
 
