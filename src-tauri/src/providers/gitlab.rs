@@ -75,10 +75,16 @@ struct GqlMr {
     /// single blocker, so another one (e.g. a failing pipeline) can mask a conflict.
     #[serde(default)]
     conflicts: bool,
+    head_pipeline: Option<GqlPipeline>,
     author: Option<GqlUser>,
     labels: Option<Conn<GqlLabel>>,
     approved_by: Option<Conn<GqlUser>>,
     reviewers: Option<Conn<GqlUser>>,
+}
+
+#[derive(Deserialize)]
+struct GqlPipeline {
+    status: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -118,6 +124,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
         approved
         detailedMergeStatus
         conflicts
+        headPipeline { status }
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -294,6 +301,13 @@ fn map_mr(base_url: &str, mr: GqlMr) -> Option<PullRequest> {
         review_decision,
         mergeable: mergeable_from_status(mr.detailed_merge_status.as_deref()),
         has_conflicts: mr.conflicts || mr.detailed_merge_status.as_deref() == Some("CONFLICT"),
+        // Only a hard FAILED counts: SUCCESS_WITH_WARNINGS (allowed failures),
+        // RUNNING, PENDING, CANCELED… are not "the pipeline broke".
+        pipeline_failed: mr
+            .head_pipeline
+            .as_ref()
+            .and_then(|p| p.status.as_deref())
+            == Some("FAILED"),
         author: mr
             .author
             .as_ref()
@@ -473,6 +487,30 @@ mod tests {
         }
         // Field absent from the fixture → unknown, not blocked.
         assert_eq!(mr_from(fixture()).unwrap().mergeable, None);
+    }
+
+    #[test]
+    fn pipeline_failed_only_on_failed_status() {
+        for (status, expected) in [
+            ("FAILED", true),
+            ("SUCCESS", false),
+            ("SUCCESS_WITH_WARNINGS", false),
+            ("RUNNING", false),
+            ("PENDING", false),
+            ("CANCELED", false),
+        ] {
+            let mut json = fixture();
+            json["headPipeline"] = serde_json::json!({ "status": status });
+            assert_eq!(mr_from(json).unwrap().pipeline_failed, expected, "{status}");
+        }
+    }
+
+    #[test]
+    fn no_pipeline_is_not_a_failure() {
+        assert!(!mr_from(fixture()).unwrap().pipeline_failed);
+        let mut json = fixture();
+        json["headPipeline"] = serde_json::Value::Null;
+        assert!(!mr_from(json).unwrap().pipeline_failed);
     }
 
     #[test]
