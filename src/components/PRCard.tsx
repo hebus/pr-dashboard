@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check, CheckCircle2, AlertTriangle } from "lucide-react";
+import { GitPullRequest, GitMerge, Clock, ChevronRight, Copy, Check, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Provider, PullRequest, ReviewDecision, Reviewer } from "../types";
 import { prPrefix, timeAgo } from "../types";
@@ -180,6 +180,15 @@ export function PRCard({ pr, provider = "github" }: Props) {
             >
               <AlertTriangle size={10} />
               Conflicts
+            </span>
+          )}
+          {pr.pipelineFailed && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--c-red-bg)] text-[var(--c-red)] border border-[var(--c-red-border)]"
+              title="The latest pipeline failed"
+            >
+              <XCircle size={10} />
+              Pipeline failed
             </span>
           )}
           {pr.mergeable === true && (

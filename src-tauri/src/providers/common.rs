@@ -55,6 +55,9 @@ pub struct PullRequest {
     /// but GitLab reports only one blocker in `detailedMergeStatus`, so a failing
     /// pipeline can hide a conflict there.
     pub has_conflicts: bool,
+    /// The latest CI pipeline / check suite on the head commit has failed.
+    /// Running, pending or missing pipelines are `false`.
+    pub pipeline_failed: bool,
     pub author: Reviewer,
     pub labels: Vec<Label>,
     pub requested_reviewers: Vec<Reviewer>,

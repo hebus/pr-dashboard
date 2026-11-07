@@ -163,6 +163,7 @@ query GetOpenPRs($owner, $repo, $first: 50) {
         headRefName, baseRefName
         reviewDecision          ← APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
         mergeStateStatus        ← CLEAN | HAS_HOOKS | UNKNOWN | BEHIND | BLOCKED | DIRTY | DRAFT | UNSTABLE
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }   ← pipelineFailed si FAILURE | ERROR
         author { login, avatarUrl }
         labels { name, color }
         reviews(last: 20) { state, author }   ← pour extraire les approbateurs
@@ -203,6 +204,7 @@ query GetOpenMRs($fullPath: ID!, $first: Int!) {
         sourceBranch targetBranch approved
         detailedMergeStatus
         conflicts
+        headPipeline { status }
         author { username avatarUrl }
         labels(first: 10) { nodes { title color } }
         approvedBy(first: 20) { nodes { username avatarUrl } }
@@ -238,6 +240,8 @@ Particularités du schéma GitLab :
 
 `hasConflicts` vaut `conflicts || detailedMergeStatus == "CONFLICT"` (`gitlab.rs::map_mr`). Le booléen `conflicts` est prioritaire : `detailedMergeStatus` n'expose qu'**un seul** bloqueur à la fois, donc un pipeline en échec peut masquer un conflit.
 
+`pipelineFailed` vaut `headPipeline.status == "FAILED"` (`gitlab.rs::map_mr`). Seul `FAILED` compte : `SUCCESS_WITH_WARNINGS` (échecs autorisés), `RUNNING`, `PENDING`, `CANCELED` ou l'absence de pipeline donnent `false`. Il ne faut pas se fier à `detailedMergeStatus == CI_MUST_PASS`, qui vaut aussi pour un pipeline en cours.
+
 > `approved` signifie « **toutes** les approbations requises sont obtenues ». Une MR approuvée 1 fois sur 2 reste `REVIEW_REQUIRED` tout en exposant ses `approvers` → elle prend le fond « partiellement approuvée », exactement comme sur GitHub. Ne pas dériver `APPROVED` d'un `approvedBy` non vide.
 
 ### GraphQL GitLab (check_pr_merged)
@@ -268,6 +272,7 @@ interface PullRequest {
   reviewDecision: ReviewDecision;
   mergeable: boolean | null;       // true: fusionnable · false: bloquée · null: statut pas encore calculé
   hasConflicts: boolean;           // conflits avec la branche cible (GitLab `conflicts`, GitHub `DIRTY`)
+  pipelineFailed: boolean;         // dernier pipeline en échec (GitLab `headPipeline.status == FAILED`, GitHub `statusCheckRollup.state` FAILURE/ERROR) → badge « Pipeline failed »
   author: Reviewer;
   labels: Label[];
   requestedReviewers: Reviewer[];  // toujours vide (non supporté sur GHES, voir note)

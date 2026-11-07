@@ -71,6 +71,8 @@ export interface PullRequest {
   mergeable: boolean | null;
   /** The branch has conflicts with its target (GitLab `conflicts`, GitHub `DIRTY`). */
   hasConflicts: boolean;
+  /** The latest pipeline / checks on the head commit failed (GitLab `FAILED`, GitHub `FAILURE`/`ERROR`). */
+  pipelineFailed: boolean;
   author: Reviewer;
   labels: Label[];
   requestedReviewers: Reviewer[];
