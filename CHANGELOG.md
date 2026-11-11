@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/hebus/pr-dashboard/compare/v0.1.7...v0.1.8) (2026-11-11)
+
+
+### Bug Fixes
+
+* **release:** sign the installer with `cargo packager signer sign` ([d609b8d](https://github.com/hebus/pr-dashboard/commit/d609b8d3455671dc2e7784a773f5e6aea47a12b7))
+* **release:** sign the installer with cargo packager signer sign ([6fb24d3](https://github.com/hebus/pr-dashboard/commit/6fb24d36c75c51386f56136f1a84360b8f05dfae))
+
 ## [0.1.7](https://github.com/hebus/pr-dashboard/compare/v0.1.6...v0.1.7) (2026-11-11)
 
 
