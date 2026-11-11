@@ -1,0 +1,17 @@
+{
+  "version": "0.1.7",
+  "notes": "Fixture",
+  "pub_date": "2026-11-11T10:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IGZha2Ugc2lnbmF0dXJl",
+      "url": "https://github.com/hebus/pr-dashboard/releases/download/v0.1.7/pr-dashboard_0.1.7_x64-setup.exe",
+      "format": "nsis"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IGZha2Ugc2lnbmF0dXJl",
+      "url": "https://github.com/hebus/pr-dashboard/releases/download/v0.1.7/pr-dashboard_0.1.7_x64-setup.exe",
+      "format": "nsis"
+    }
+  }
+}

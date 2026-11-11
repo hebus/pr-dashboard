@@ -1,12 +1,15 @@
 name: Release
 
 # Every push to develop runs release-please. It keeps a "release PR" up to date
-# (version bump in package.json, package-lock.json, tauri.conf.json, Cargo.toml and
-# Cargo.lock + CHANGELOG, computed from the conventional commits). Merging that PR
-# makes release-please tag the commit and create the GitHub release; the jobs below
-# then build, sign and attach the installers and `latest.json` to that release.
+# (version bump in Cargo.toml + Cargo.lock + CHANGELOG, computed from the
+# conventional commits). Merging that PR makes release-please tag the commit and
+# create the GitHub release; the `build` job then builds the Windows installer,
+# signs it and attaches it, its signature and `latest.json` to that release.
 #
-# The build jobs live in this same workflow on purpose: a tag created with
+# `latest.json` is what the app (and the previous Tauri build) polls at
+# https://github.com/<repo>/releases/latest/download/latest.json
+#
+# The build job lives in this same workflow on purpose: a tag created with
 # GITHUB_TOKEN does not trigger other workflows.
 on:
   push:
@@ -36,9 +39,9 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # release-please's TOML updater cannot target a package by name in Cargo.lock
-  # (filters return nothing on its parsed lockfile), so the lockfile is synced here.
-  # Separate job on purpose: a failure here must never block a release build.
+  # release-please's TOML updater cannot target a package by name in Cargo.lock,
+  # so the lockfile is synced here. Separate job on purpose: a failure here must
+  # never block a release build.
   sync-lockfile:
     needs: release-please
     if: ${{ needs.release-please.outputs.prs_created == 'true' }}
@@ -51,35 +54,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Sync Cargo.lock with the bumped version
-        run: cargo update --workspace --manifest-path src-tauri/Cargo.toml
+        run: cargo update --workspace
 
       - name: Commit if changed
         run: |
-          if git diff --quiet -- src-tauri/Cargo.lock; then
+          if git diff --quiet -- Cargo.lock; then
             echo "Cargo.lock already in sync"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: sync Cargo.lock" -- src-tauri/Cargo.lock
+          git commit -m "chore: sync Cargo.lock" -- Cargo.lock
           git push
 
-  build:
+  build-windows:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            args: ""
-          - os: macos-latest
-            args: "--target aarch64-apple-darwin"
-          - os: macos-latest
-            args: "--target x86_64-apple-darwin"
-          - os: ubuntu-22.04
-            args: ""
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
+    env:
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,41 +82,58 @@ jobs:
       - name: Check tag matches the app version
         shell: bash
         run: |
-          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$version" != "${{ needs.release-please.outputs.tag_name }}" ]; then
-            echo "Tag ${{ needs.release-please.outputs.tag_name }} does not match tauri.conf.json version $version" >&2
+          version=$(python -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
+          if [ "v$version" != "$TAG" ]; then
+            echo "Tag $TAG does not match the workspace version $version" >&2
             exit 1
           fi
-
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ contains(matrix.args, 'darwin') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
+
+      # Same bundler Tauri uses, as a standalone tool. Pinned, and installed as a
+      # cached binary rather than compiled on every release.
+      - uses: baptiste0928/cargo-install@v3
         with:
-          workspaces: src-tauri
+          crate: cargo-packager
+          version: "=0.11.8"
+          locked: true
 
-      - run: npm ci
-
-      # No releaseName/releaseBody: the release already exists (created by
-      # release-please) and keeps its generated changelog as body.
-      - uses: tauri-apps/tauri-action@v0
+      # Builds the release binary (beforePackagingCommand), makes the NSIS
+      # installer and signs it: the same minisign key as the Tauri build, so
+      # installs of either build accept it.
+      - name: Build, package and sign
+        working-directory: crates/app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ needs.release-please.outputs.tag_name }}
-          prerelease: false
-          args: ${{ matrix.args }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: cargo packager --release
+
+      - name: Generate latest.json
+        shell: bash
+        run: |
+          installer="dist/pr-dashboard_${VERSION}_x64-setup.exe"
+          ls -la dist
+          test -f "$installer" || { echo "missing $installer" >&2; exit 1; }
+          test -f "$installer.sig" || { echo "missing $installer.sig (is the signing key set?)" >&2; exit 1; }
+          notes=$(gh release view "$TAG" --json body --jq .body)
+          python scripts/make_latest_json.py \
+            --version "$VERSION" \
+            --repo "${{ github.repository }}" \
+            --installer "$installer" \
+            --signature "$installer.sig" \
+            --notes "$notes" \
+            --out dist/latest.json
+
+      # The release already exists (created by release-please) and keeps its
+      # generated changelog as body.
+      - name: Attach to the release
+        shell: bash
+        run: |
+          gh release upload "$TAG" \
+            "dist/pr-dashboard_${VERSION}_x64-setup.exe" \
+            "dist/pr-dashboard_${VERSION}_x64-setup.exe.sig" \
+            dist/latest.json \
+            --clobber
