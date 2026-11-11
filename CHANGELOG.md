@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/hebus/pr-dashboard/compare/v0.1.6...v0.1.7) (2026-11-11)
+
+
+### Features
+
+* rewrite the app in Rust with GPUI, replacing Tauri + React ([2cb34c4](https://github.com/hebus/pr-dashboard/commit/2cb34c4c33b3b644c39ba4d3d13c94fac06c0c27))
+* rewrite the app in Rust with GPUI, replacing Tauri + React ([c19adcb](https://github.com/hebus/pr-dashboard/commit/c19adcba6a681fc8a85b9cd386023664e1bb3d90))
+
 ## [0.1.6](https://github.com/hebus/pr-dashboard/compare/v0.1.5...v0.1.6) (2026-11-07)
 
 
