@@ -11,10 +11,20 @@ name: Release
 #
 # The build job lives in this same workflow on purpose: a tag created with
 # GITHUB_TOKEN does not trigger other workflows.
+#
+# If the build job fails after the release was created, re-run it for that tag
+# from the Actions tab ("Run workflow" on this workflow, with the tag as input).
+# Re-running the failed run itself would use the workflow file as it was then.
 on:
   push:
     branches:
       - develop
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build the installer for and attach it to (e.g. v0.1.7)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -26,6 +36,7 @@ concurrency:
 
 jobs:
   release-please:
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
@@ -69,15 +80,17 @@ jobs:
 
   build-windows:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # `!cancelled()` lets this job run when release-please was skipped, which is
+    # the case for a manual run.
+    if: ${{ !cancelled() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: windows-latest
     env:
-      TAG: ${{ needs.release-please.outputs.tag_name }}
+      TAG: ${{ github.event.inputs.tag || needs.release-please.outputs.tag_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ env.TAG }}
 
       - name: Check tag matches the app version
         shell: bash
@@ -101,15 +114,26 @@ jobs:
           version: "=0.11.8"
           locked: true
 
-      # Builds the release binary (beforePackagingCommand), makes the NSIS
-      # installer and signs it: the same minisign key as the Tauri build, so
-      # installs of either build accept it.
-      - name: Build, package and sign
+      # Builds the release binary (beforePackagingCommand) and makes the NSIS
+      # installer. Signing is a separate step, see below.
+      - name: Build and package
         working-directory: crates/app
+        run: cargo packager --release
+
+      # The same minisign key as the Tauri build, so installs of either build
+      # accept the update. It was created with an empty password, and there is
+      # no password secret.
+      #
+      # `cargo packager signer sign` treats a missing password as an empty one.
+      # The main `cargo packager` command does not, and fails with "Wrong
+      # password for that key": that is why signing is not done by the
+      # packaging step above.
+      - name: Sign the installer
+        shell: bash
         env:
           CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: cargo packager --release
+        run: cargo packager signer sign "dist/pr-dashboard_${VERSION}_x64-setup.exe"
 
       - name: Generate latest.json
         shell: bash

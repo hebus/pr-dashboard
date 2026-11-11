@@ -59,6 +59,15 @@ Notes that are easy to get wrong:
   mode), signs it with the minisign key (`TAURI_SIGNING_PRIVATE_KEY` secret,
   mapped to `CARGO_PACKAGER_SIGN_PRIVATE_KEY`) and uploads the installer, its
   `.sig` and `latest.json` to the release.
+* **Signing is its own step, with `cargo packager signer sign`.** The key was
+  created with an empty password and there is no password secret.
+  `signer sign` treats a missing password as empty; the main `cargo packager`
+  command passes it through as "none" and fails with "Wrong password for that
+  key". Do not move signing back into the packaging step.
+* If the build job fails after the release exists, run the `Release` workflow
+  by hand (Actions, "Run workflow") with the tag as input. It rebuilds that tag
+  and uploads to the existing release. Re-running the failed run would use the
+  workflow file as it was when it ran, so it cannot pick up a fix.
 * `latest.json` is read by two updaters: this app (`cargo-packager-updater`,
   needs a `format` field) and the previous Tauri build (`tauri-plugin-updater`,
   ignores it). It is served from `releases/latest/download/latest.json`.
