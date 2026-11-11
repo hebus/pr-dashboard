@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # GPUI needs a graphics stack to build; Windows is the supported target.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  manifest-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: latest.json generator output matches the committed fixture
+        run: |
+          echo "ZmFrZS1zaWduYXR1cmU=" > /tmp/fake.sig
+          touch /tmp/pr-dashboard_0.1.7_x64-setup.exe
+          python scripts/make_latest_json.py \
+            --version 0.1.7 --repo hebus/pr-dashboard \
+            --installer /tmp/pr-dashboard_0.1.7_x64-setup.exe \
+            --signature /tmp/fake.sig \
+            --notes "Fixture" --pub-date 2026-11-11T10:00:00Z \
+            --out /tmp/latest.json
+          python - <<'EOF'
+          import json
+          generated = json.load(open("/tmp/latest.json"))
+          fixture = json.load(open("crates/app/tests/fixtures/latest.json"))
+          # Only the signature text differs between this run and the fixture.
+          for d in (generated, fixture):
+              for p in d["platforms"].values():
+                  p["signature"] = "<sig>"
+          assert generated == fixture, "regenerate crates/app/tests/fixtures/latest.json"
+          print("fixture is up to date")
+          EOF

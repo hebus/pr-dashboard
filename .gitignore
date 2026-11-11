@@ -1,28 +1,22 @@
+# Rust build output
+/target/
+# Installers and update manifest produced by `cargo packager`
+/dist/
+
+# Leftovers of the previous Tauri + React build, still on disk in existing
+# checkouts. They can be deleted by hand.
+node_modules
+src-tauri/target/
+
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.sw?
-
-# Rust build artifacts
-src-tauri/target/
 
 # Claude Code local config
 .claude/

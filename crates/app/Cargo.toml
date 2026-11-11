@@ -1,0 +1,43 @@
+[package]
+name = "pr-dashboard-app"
+version.workspace = true
+edition.workspace = true
+description = "Pull / merge request dashboard for GitHub and GitLab"
+build = "build.rs"
+
+# Same executable name as the Tauri build: the NSIS installer upgrades an
+# existing install in place only if the main binary and product name match.
+[[bin]]
+name = "pr-dashboard"
+path = "src/main.rs"
+
+[dependencies]
+gpui = "0.2.2"
+gpui-component = "=0.5.1"
+pr-dashboard-core = { path = "../core" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
+chrono = "0.4"
+gpui-component-assets = "=0.5.1"
+cargo-packager-updater = "=0.2.3"
+
+[dev-dependencies]
+serde_json = "1"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+# Read by `cargo packager` (run from this directory). Keys are camelCase: the
+# config uses `deny_unknown_fields`, and only a few keys accept a kebab alias.
+[package.metadata.packager]
+productName = "pr-dashboard"
+identifier = "com.sinequa.prdashboard"
+description = "Pull / merge request dashboard for GitHub and GitLab"
+formats = ["nsis"]
+icons = ["assets/appicon/icon.ico", "assets/appicon/icon.png"]
+outDir = "../../dist"
+binariesDir = "../../target/release"
+binaries = [{ path = "pr-dashboard", main = true }]
+beforePackagingCommand = "cargo build --release -p pr-dashboard-app"
+
+[package.metadata.packager.nsis]
+installMode = "currentUser"
