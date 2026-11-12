@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.11](https://github.com/hebus/pr-dashboard/compare/v0.1.10...v0.1.11) (2026-11-12)
+
+
+### Features
+
+* **settings:** support github.com alongside GitHub Enterprise ([ff0dec5](https://github.com/hebus/pr-dashboard/commit/ff0dec570793f738e0f127521c9b12eeccce965b))
+* **settings:** support github.com alongside GitHub Enterprise ([7ef133b](https://github.com/hebus/pr-dashboard/commit/7ef133b10efbd313cd9a4de64830c518433d1cbf))
+
 ## [0.1.10](https://github.com/hebus/pr-dashboard/compare/v0.1.9...v0.1.10) (2026-11-12)
 
 

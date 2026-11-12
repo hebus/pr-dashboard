@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "pr-dashboard-app"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "cargo-packager-updater",
  "chrono",
@@ -4415,7 +4415,7 @@ dependencies = [
 
 [[package]]
 name = "pr-dashboard-core"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
