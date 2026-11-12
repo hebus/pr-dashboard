@@ -7,9 +7,10 @@ use std::time::Duration;
 
 use gpui::{
     div, prelude::*, px, relative, rgba, Context, Entity, EventEmitter, FontWeight, IntoElement,
-    SharedString, Subscription, Window,
+    ScrollHandle, SharedString, Subscription, Window,
 };
 use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::scroll::ScrollableElement;
 use pr_dashboard_core::config::{Config, RepositoryConfig};
 use pr_dashboard_core::logic::generate_id;
 use pr_dashboard_core::providers::common::Provider;
@@ -53,6 +54,8 @@ pub struct SettingsView {
     repos: Vec<RepoEdit>,
     notification_sent: bool,
     error: Option<String>,
+    /// Scroll position of the dialog body (it has its own scrollbar).
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -131,6 +134,7 @@ impl SettingsView {
             repos,
             notification_sent: false,
             error: None,
+            scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -413,11 +417,12 @@ impl Render for SettingsView {
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(SettingsEvent::Close))),
             );
 
-        let body = div()
+        let body_content = div()
             .id("settings-body")
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
+            .track_scroll(&self.scroll)
             .p_5()
             .flex()
             .flex_col()
@@ -514,6 +519,17 @@ impl Render for SettingsView {
                         e.child(div().flex().flex_col().gap_2().children(repo_rows))
                     }),
             );
+
+        // The wrapper positions the scrollbar; the content inside keeps the
+        // `flex_1` + `min_h_0` that lets it shrink to the modal's max height.
+        let body = div()
+            .relative()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_h_0()
+            .child(body_content)
+            .vertical_scrollbar(&self.scroll);
 
         let footer = div()
             .flex()
