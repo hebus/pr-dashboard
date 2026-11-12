@@ -5,9 +5,10 @@ use std::time::Instant;
 
 use gpui::{
     div, list, prelude::*, px, rgb, Context, Entity, FontWeight, IntoElement, ListAlignment,
-    ListState, SharedString, Subscription, Window,
+    ListState, ScrollHandle, SharedString, Subscription, Window,
 };
 use gpui_component::input::{InputEvent, InputState};
+use gpui_component::scroll::ScrollableElement;
 use pr_dashboard_core::logic::{EventKind, FilterStatus, PrEvent};
 use pr_dashboard_core::providers::common::Provider;
 
@@ -39,6 +40,8 @@ pub struct AppView {
     pub(crate) show_notifications: bool,
     /// When the panel last closed because of a click outside it.
     pub(crate) notifications_closed_at: Option<Instant>,
+    /// Scroll position of the notification list (it has its own scrollbar).
+    pub(crate) notifications_scroll: ScrollHandle,
     pub(crate) toasts: Vec<Toast>,
     pub(crate) next_toast_id: u64,
     _subscriptions: Vec<Subscription>,
@@ -102,6 +105,7 @@ impl AppView {
             _settings_subscription: None,
             show_notifications: false,
             notifications_closed_at: None,
+            notifications_scroll: ScrollHandle::new(),
             toasts: Vec::new(),
             next_toast_id: 1,
             _subscriptions: subscriptions,
@@ -308,14 +312,20 @@ impl Render for AppView {
                 .flex_col()
                 .child(self.filter_bar(totals, &t, cx))
                 .child(
-                    // Only the rows on screen are built each frame.
-                    div().flex_1().min_h_0().child(
-                        list(
-                            self.list_state.clone(),
-                            cx.processor(|this, ix, _window, cx| this.render_row(ix, cx)),
+                    // Only the rows on screen are built each frame. The scrollbar is
+                    // drawn over the right edge, in the gutter left by the rows' padding.
+                    div()
+                        .relative()
+                        .flex_1()
+                        .min_h_0()
+                        .child(
+                            list(
+                                self.list_state.clone(),
+                                cx.processor(|this, ix, _window, cx| this.render_row(ix, cx)),
+                            )
+                            .size_full(),
                         )
-                        .size_full(),
-                    ),
+                        .vertical_scrollbar(&self.list_state),
                 )
                 .into_any_element()
         };

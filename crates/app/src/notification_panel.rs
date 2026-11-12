@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use gpui::{div, prelude::*, px, Context, FontWeight, IntoElement, SharedString};
+use gpui_component::scroll::ScrollableElement;
 use pr_dashboard_core::logic::{time_ago, EventKind};
 
 use crate::theme::Theme;
@@ -200,13 +201,25 @@ impl AppView {
                 )
             })
             .when(!empty, |e| {
+                // The wrapper positions the scrollbar; the list inside keeps the
+                // `flex_1` + `min_h_0` that lets it shrink to the panel's max height.
                 e.child(
                     div()
-                        .id("notif-list")
+                        .relative()
+                        .flex()
+                        .flex_col()
                         .flex_1()
                         .min_h_0()
-                        .overflow_y_scroll()
-                        .children(rows),
+                        .child(
+                            div()
+                                .id("notif-list")
+                                .flex_1()
+                                .min_h_0()
+                                .overflow_y_scroll()
+                                .track_scroll(&self.notifications_scroll)
+                                .children(rows),
+                        )
+                        .vertical_scrollbar(&self.notifications_scroll),
                 )
             })
     }
