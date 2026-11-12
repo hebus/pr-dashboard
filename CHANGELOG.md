@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.10](https://github.com/hebus/pr-dashboard/compare/v0.1.9...v0.1.10) (2026-11-12)
+
+
+### Bug Fixes
+
+* **ui:** make the scrollbar follow the mouse wheel on the PR list ([2046319](https://github.com/hebus/pr-dashboard/commit/2046319c824326f210e6c9a1f852d6e8d07fdd78))
+* **ui:** make the scrollbar follow the mouse wheel on the PR list ([bf9bfe0](https://github.com/hebus/pr-dashboard/commit/bf9bfe039219d9fd749ca6e031e043187ef41f44))
+
 ## [0.1.9](https://github.com/hebus/pr-dashboard/compare/v0.1.8...v0.1.9) (2026-11-12)
 
 
