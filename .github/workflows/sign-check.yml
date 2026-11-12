@@ -1,0 +1,37 @@
+name: Sign check
+
+# Signs a throwaway file with the release signing key, the way `release.yml` does,
+# in about a minute instead of a full release build. Run it after touching the
+# signing step or the key. It prints the signature so it can be checked against
+# the public key embedded in the app (crates/app/src/updater.rs).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/sign-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Sign a test file
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          printf 'signing check' > check.txt
+          npx --yes @tauri-apps/cli@2.11.1 signer sign check.txt
+          test -s check.txt.sig || { echo "no signature was written" >&2; exit 1; }
+          echo "----- file sha256"
+          sha256sum check.txt
+          echo "----- signature (public, not a secret)"
+          cat check.txt.sig
+          echo

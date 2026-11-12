@@ -121,19 +121,24 @@ jobs:
         run: cargo packager --release
 
       # The same minisign key as the Tauri build, so installs of either build
-      # accept the update. It was created with an empty password, and there is
-      # no password secret.
+      # accept the update, signed with the same tool and version the Tauri build
+      # used (@tauri-apps/cli 2.11.1, with an empty password env var, exactly as
+      # in the previous release workflow). The .sig it writes is a standard
+      # minisign signature, which cargo-packager-updater verifies.
       #
-      # `cargo packager signer sign` treats a missing password as an empty one.
-      # The main `cargo packager` command does not, and fails with "Wrong
-      # password for that key": that is why signing is not done by the
-      # packaging step above.
+      # Do not use `cargo packager` / `cargo packager signer sign` for this: they
+      # fail on this key with "Wrong password for that key", with or without a
+      # password. See guides/ARCHITECTURE.md.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
       - name: Sign the installer
         shell: bash
         env:
-          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: cargo packager signer sign "dist/pr-dashboard_${VERSION}_x64-setup.exe"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx --yes @tauri-apps/cli@2.11.1 signer sign "dist/pr-dashboard_${VERSION}_x64-setup.exe"
 
       - name: Generate latest.json
         shell: bash

@@ -59,11 +59,15 @@ Notes that are easy to get wrong:
   mode), signs it with the minisign key (`TAURI_SIGNING_PRIVATE_KEY` secret,
   mapped to `CARGO_PACKAGER_SIGN_PRIVATE_KEY`) and uploads the installer, its
   `.sig` and `latest.json` to the release.
-* **Signing is its own step, with `cargo packager signer sign`.** The key was
-  created with an empty password and there is no password secret.
-  `signer sign` treats a missing password as empty; the main `cargo packager`
-  command passes it through as "none" and fails with "Wrong password for that
-  key". Do not move signing back into the packaging step.
+* **The installer is signed with the Tauri CLI, not with `cargo-packager`.**
+  The release step runs `npx @tauri-apps/cli@2.11.1 signer sign`, the same tool
+  and version that signed the Tauri releases with this same secret and an empty
+  password variable. `cargo packager` and `cargo packager signer sign` both
+  failed on this key with "Wrong password for that key" (the first with an
+  empty password variable, the second which always sends an empty password).
+  The `.sig` is a standard minisign signature, so `cargo-packager-updater`
+  verifies it. Run the `Sign check` workflow after touching the key or this
+  step: it signs a throwaway file in about a minute.
 * If the build job fails after the release exists, run the `Release` workflow
   by hand (Actions, "Run workflow") with the tag as input. It rebuilds that tag
   and uploads to the existing release. Re-running the failed run would use the
