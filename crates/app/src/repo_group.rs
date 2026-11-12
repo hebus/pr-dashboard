@@ -25,7 +25,7 @@ const SKELETON_WIDTHS: [f32; 3] = [160., 120., 210.];
 /// Vertical gap between two groups.
 const GROUP_GAP: f32 = 12.;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum BodyContent {
     Error(String),
     Skeleton(usize),
@@ -35,7 +35,7 @@ pub(crate) enum BodyContent {
     Card { pr_idx: usize },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Row {
     Header { repo_idx: usize, collapsed: bool },
     Body { repo_idx: usize, first: bool, last: bool, content: BodyContent },
@@ -84,9 +84,16 @@ fn skeleton_card(t: &Theme, title_width: f32) -> impl IntoElement {
 }
 
 impl AppView {
-    /// Flattens the repositories into list rows and tells the list. Uses
-    /// `splice` rather than `reset`, which would jump back to the top on every
-    /// polling refresh.
+    /// Flattens the repositories into list rows and tells the list.
+    ///
+    /// A list only knows the height of rows it has measured, and an unmeasured
+    /// row counts as 0 pixels. By default it measures just the rows on screen
+    /// plus the overdraw, so its total height, and with it the wheel's limit and
+    /// the scrollbar thumb, kept changing as the user scrolled. `measure_all()`
+    /// (set where the list is created) fixes that, but it only measures again
+    /// after a `reset`. So when the rows change, reset the list and put the
+    /// scroll position back; when they do not, leave it alone, which keeps the
+    /// measured heights and avoids re-measuring on every polling refresh.
     pub(crate) fn rebuild_rows(&mut self, cx: &Context<Self>) {
         let query = self.search.read(cx).value().to_string();
         let d = self.dashboard.read(cx);
@@ -147,9 +154,18 @@ impl AppView {
             rows.push(Row::Spacer);
         }
 
-        let old_len = self.rows.len();
+        // Polling refreshes and "loading" toggles usually leave the rows as they
+        // were. The visible cards are redrawn from current data on every frame
+        // anyway, so nothing needs updating.
+        if rows == self.rows {
+            return;
+        }
+
+        // `reset` drops the scroll position, so restore it by item index.
+        let anchor = self.list_state.logical_scroll_top();
         self.rows = rows;
-        self.list_state.splice(0..old_len, self.rows.len());
+        self.list_state.reset(self.rows.len());
+        self.list_state.scroll_to(anchor);
     }
 
     /// Builds one list row. Every row has the same definite width, centered and

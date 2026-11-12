@@ -99,7 +99,10 @@ impl AppView {
             collapsed: HashSet::new(),
             copied: None,
             rows: Vec::new(),
-            list_state: ListState::new(0, ListAlignment::Top, px(LIST_OVERDRAW)),
+            // `measure_all`: without it the list only knows the height of the rows
+            // it has drawn, and the scrollbar thumb jumps while scrolling with
+            // the wheel. See `rebuild_rows`.
+            list_state: ListState::new(0, ListAlignment::Top, px(LIST_OVERDRAW)).measure_all(),
             rows_dirty: true,
             settings: None,
             _settings_subscription: None,
