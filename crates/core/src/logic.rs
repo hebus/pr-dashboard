@@ -14,13 +14,19 @@ pub fn provider_creds<'a>(config: &'a Config, repo: &RepositoryConfig) -> (&'a s
     match repo.provider {
         Provider::Gitlab => (&config.gitlab_token, &config.gitlab_url),
         Provider::Github => (&config.github_token, &config.github_url),
+        Provider::GithubCom => (&config.github_com_token, GITHUB_COM_URL),
     }
 }
+
+/// Web URL of github.com, the fixed "instance" of the `GithubCom` provider.
+pub const GITHUB_COM_URL: &str = "https://github.com";
 
 pub fn repo_web_url(base_url: &str, repo: &RepositoryConfig) -> String {
     match repo.provider {
         Provider::Gitlab => format!("{base_url}/{}/{}/-/merge_requests", repo.owner, repo.name),
-        Provider::Github => format!("{base_url}/{}/{}/pulls", repo.owner, repo.name),
+        Provider::Github | Provider::GithubCom => {
+            format!("{base_url}/{}/{}/pulls", repo.owner, repo.name)
+        }
     }
 }
 
@@ -28,7 +34,7 @@ pub fn repo_web_url(base_url: &str, repo: &RepositoryConfig) -> String {
 pub fn pr_term(provider: Provider) -> &'static str {
     match provider {
         Provider::Gitlab => "MR",
-        Provider::Github => "PR",
+        Provider::Github | Provider::GithubCom => "PR",
     }
 }
 
@@ -36,7 +42,7 @@ pub fn pr_term(provider: Provider) -> &'static str {
 pub fn pr_prefix(provider: Provider) -> &'static str {
     match provider {
         Provider::Gitlab => "!",
-        Provider::Github => "#",
+        Provider::Github | Provider::GithubCom => "#",
     }
 }
 

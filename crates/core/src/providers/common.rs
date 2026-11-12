@@ -8,12 +8,16 @@ pub enum Provider {
     #[default]
     Github,
     Gitlab,
+    /// github.com itself (as opposed to a GitHub Enterprise Server instance).
+    #[serde(rename = "githubcom")]
+    GithubCom,
 }
 
 impl Provider {
     pub fn label(&self) -> &'static str {
         match self {
             Provider::Github => "GitHub",
+            Provider::GithubCom => "GitHub.com",
             Provider::Gitlab => "GitLab",
         }
     }

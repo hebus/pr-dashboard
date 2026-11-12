@@ -22,7 +22,7 @@ pub async fn fetch_repo_prs(
     let base = base_url.trim_end_matches('/');
 
     let result = match provider {
-        Provider::Github => github::fetch_prs(&client, base, token, owner, repo).await,
+        Provider::Github | Provider::GithubCom => github::fetch_prs(&client, base, token, owner, repo).await,
         Provider::Gitlab => gitlab::fetch_prs(&client, base, token, owner, repo).await,
     };
 
@@ -51,7 +51,7 @@ pub async fn check_pr_merged(
     let client = make_client()?;
     let base = base_url.trim_end_matches('/');
     match provider {
-        Provider::Github => github::check_merged(&client, base, token, owner, repo, number).await,
+        Provider::Github | Provider::GithubCom => github::check_merged(&client, base, token, owner, repo, number).await,
         Provider::Gitlab => gitlab::check_merged(&client, base, token, owner, repo, number).await,
     }
 }
