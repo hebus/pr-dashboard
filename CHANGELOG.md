@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.9](https://github.com/hebus/pr-dashboard/compare/v0.1.8...v0.1.9) (2026-11-12)
+
+
+### Features
+
+* **ui:** show scrollbars on the PR list, notifications and Settings ([c4ae00d](https://github.com/hebus/pr-dashboard/commit/c4ae00dbf2ac47c001c3116abcd10377c329eeb0))
+* **ui:** show scrollbars on the PR list, notifications and Settings ([c1fd71f](https://github.com/hebus/pr-dashboard/commit/c1fd71f1341bc053135ad9e793b386e0c775e014))
+
 ## [0.1.8](https://github.com/hebus/pr-dashboard/compare/v0.1.7...v0.1.8) (2026-11-11)
 
 
