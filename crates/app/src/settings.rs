@@ -12,7 +12,7 @@ use gpui::{
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::scroll::ScrollableElement;
 use pr_dashboard_core::config::{Config, RepositoryConfig};
-use pr_dashboard_core::logic::generate_id;
+use pr_dashboard_core::logic::{generate_id, GITHUB_COM_URL};
 use pr_dashboard_core::providers::common::Provider;
 
 use crate::state::Dashboard;
@@ -33,7 +33,8 @@ pub enum SettingsEvent {
 impl EventEmitter<SettingsEvent> for SettingsView {}
 
 struct SourceEdit {
-    url: Entity<InputState>,
+    /// `None` for github.com, whose URL is fixed.
+    url: Option<Entity<InputState>>,
     token: Entity<InputState>,
     show_token: bool,
 }
@@ -49,6 +50,7 @@ struct RepoEdit {
 pub struct SettingsView {
     dashboard: Entity<Dashboard>,
     github: SourceEdit,
+    github_com: SourceEdit,
     gitlab: SourceEdit,
     interval: Entity<InputState>,
     repos: Vec<RepoEdit>,
@@ -78,7 +80,7 @@ fn make_input(
 fn owner_placeholder(provider: Provider) -> &'static str {
     match provider {
         Provider::Gitlab => "namespace",
-        Provider::Github => "owner",
+        Provider::Github | Provider::GithubCom => "owner",
     }
 }
 
@@ -101,12 +103,17 @@ impl SettingsView {
         let config = dashboard.read(cx).config.clone();
 
         let github = SourceEdit {
-            url: make_input(window, cx, &config.github_url, "https://github.sinequa.com", false),
+            url: Some(make_input(window, cx, &config.github_url, "https://github.sinequa.com", false)),
             token: make_input(window, cx, &config.github_token, "ghp_...", true),
             show_token: false,
         };
+        let github_com = SourceEdit {
+            url: None,
+            token: make_input(window, cx, &config.github_com_token, "ghp_... / github_pat_...", true),
+            show_token: false,
+        };
         let gitlab = SourceEdit {
-            url: make_input(window, cx, &config.gitlab_url, "https://gitlab.chapsvision.in", false),
+            url: Some(make_input(window, cx, &config.gitlab_url, "https://gitlab.chapsvision.in", false)),
             token: make_input(window, cx, &config.gitlab_token, "glpat-...", true),
             show_token: false,
         };
@@ -117,6 +124,7 @@ impl SettingsView {
         // The "create one at <url>/settings/tokens" hint follows the URL field.
         let subscriptions = [&github.url, &gitlab.url]
             .into_iter()
+            .flatten()
             .map(|input| {
                 cx.subscribe(input, |_, _, event: &InputEvent, cx| {
                     if matches!(event, InputEvent::Change) {
@@ -129,6 +137,7 @@ impl SettingsView {
         SettingsView {
             dashboard,
             github,
+            github_com,
             gitlab,
             interval,
             repos,
@@ -144,6 +153,7 @@ impl SettingsView {
     fn toggle_token(&mut self, provider: Provider, window: &mut Window, cx: &mut Context<Self>) {
         let edit = match provider {
             Provider::Github => &mut self.github,
+            Provider::GithubCom => &mut self.github_com,
             Provider::Gitlab => &mut self.gitlab,
         };
         edit.show_token = !edit.show_token;
@@ -172,7 +182,8 @@ impl SettingsView {
     fn toggle_repo_provider(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(repo) = self.repos.iter_mut().find(|r| r.id == id) {
             repo.provider = match repo.provider {
-                Provider::Github => Provider::Gitlab,
+                Provider::Github => Provider::GithubCom,
+                Provider::GithubCom => Provider::Gitlab,
                 Provider::Gitlab => Provider::Github,
             };
             let provider = repo.provider;
@@ -210,9 +221,14 @@ impl SettingsView {
         let text = |input: &Entity<InputState>| input.read(cx).value().trim().to_string();
         let url = |input: &Entity<InputState>| text(input).trim_end_matches('/').to_string();
 
-        config.github_url = url(&self.github.url);
+        if let Some(input) = &self.github.url {
+            config.github_url = url(input);
+        }
         config.github_token = text(&self.github.token);
-        config.gitlab_url = url(&self.gitlab.url);
+        config.github_com_token = text(&self.github_com.token);
+        if let Some(input) = &self.gitlab.url {
+            config.gitlab_url = url(input);
+        }
         config.gitlab_token = text(&self.gitlab.token);
         config.refresh_interval = text(&self.interval)
             .parse::<u64>()
@@ -252,26 +268,38 @@ impl SettingsView {
 
     fn source_section(&self, provider: Provider, t: &Theme, cx: &Context<Self>) -> impl IntoElement {
         let t = *t;
-        let is_gitlab = provider == Provider::Gitlab;
-        let edit = if is_gitlab { &self.gitlab } else { &self.github };
-        let (name, icon_path, hint, scope, token_path) = if is_gitlab {
-            (
+        let edit = match provider {
+            Provider::Gitlab => &self.gitlab,
+            Provider::Github => &self.github,
+            Provider::GithubCom => &self.github_com,
+        };
+        let (name, icon_path, hint, scope, token_path) = match provider {
+            Provider::Gitlab => (
                 "GitLab",
                 "icons/gitlab.svg",
                 "URL de votre instance GitLab.",
                 "read_api",
                 "/-/user_settings/personal_access_tokens",
-            )
-        } else {
-            (
-                "GitHub",
+            ),
+            Provider::Github => (
+                "GitHub Enterprise",
                 "icons/github.svg",
-                "URL de votre instance GitHub (Enterprise ou github.com).",
+                "URL de votre instance GitHub Enterprise.",
                 "repo",
                 "/settings/tokens",
-            )
+            ),
+            Provider::GithubCom => (
+                "GitHub.com",
+                "icons/github.svg",
+                "github.com : pour vos dépôts privés personnels ou d'organisation.",
+                "repo",
+                "/settings/tokens",
+            ),
         };
-        let url_now = edit.url.read(cx).value().trim_end_matches('/').to_string();
+        let url_now = match &edit.url {
+            Some(input) => input.read(cx).value().trim_end_matches('/').to_string(),
+            None => GITHUB_COM_URL.to_string(),
+        };
 
         let eye = div()
             .id(SharedString::from(format!("eye-{name}")))
@@ -305,7 +333,7 @@ impl SettingsView {
                     .flex_col()
                     .gap_1p5()
                     .child(div().text_xs().text_color(t.text_muted).child(hint))
-                    .child(Input::new(&edit.url)),
+                    .children(edit.url.as_ref().map(Input::new)),
             )
             .child(
                 div()
@@ -338,7 +366,10 @@ impl SettingsView {
 
     fn repo_row(&self, repo: &RepoEdit, t: &Theme, cx: &Context<Self>) -> impl IntoElement {
         let t = *t;
-        let is_gitlab = repo.provider == Provider::Gitlab;
+        let provider_icon = match repo.provider {
+            Provider::Gitlab => "icons/gitlab.svg",
+            Provider::Github | Provider::GithubCom => "icons/github.svg",
+        };
         let toggle_id = repo.id.clone();
         let remove_id = repo.id.clone();
 
@@ -349,14 +380,14 @@ impl SettingsView {
             .child(
                 text_button(
                     format!("provider-{}", repo.id),
-                    if is_gitlab { "GitLab" } else { "GitHub" },
-                    Some(if is_gitlab { "icons/gitlab.svg" } else { "icons/github.svg" }),
+                    repo.provider.label(),
+                    Some(provider_icon),
                     t.text,
                     Some(t.bg),
                     t.bg_hover,
                 )
                 .flex_none()
-                .w(px(88.))
+                .w(px(108.))
                 .border_1()
                 .border_color(t.border)
                 .on_click(cx.listener(move |this, _, window, cx| {
@@ -427,6 +458,7 @@ impl Render for SettingsView {
             .flex()
             .flex_col()
             .gap_5()
+            .child(self.source_section(Provider::GithubCom, &t, cx))
             .child(self.source_section(Provider::Github, &t, cx))
             .child(self.source_section(Provider::Gitlab, &t, cx))
             .child(

@@ -139,6 +139,23 @@ query GetOpenPRs($owner: String!, $repo: String!, $first: Int!) {
 }
 "#;
 
+// ── Endpoints ───────────────────────────────────────────────────────────────
+
+/// `(graphql_url, rest_base)` for a web base URL. github.com serves its API
+/// from `api.github.com`; GitHub Enterprise Server under `/api/graphql` and
+/// `/api/v3` of the instance itself.
+fn api_endpoints(base_url: &str) -> (String, String) {
+    let base = base_url.trim_end_matches('/');
+    if base.eq_ignore_ascii_case("https://github.com") {
+        (
+            "https://api.github.com/graphql".to_string(),
+            "https://api.github.com".to_string(),
+        )
+    } else {
+        (format!("{base}/api/graphql"), format!("{base}/api/v3"))
+    }
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 pub async fn fetch_prs(
@@ -154,7 +171,7 @@ pub async fn fetch_prs(
     });
 
     let response = client
-        .post(format!("{}/api/graphql", base_url))
+        .post(api_endpoints(base_url).0)
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
         .json(&body)
@@ -262,8 +279,11 @@ pub async fn check_merged(
     number: u64,
 ) -> Result<bool, String> {
     let url = format!(
-        "{}/api/v3/repos/{}/{}/pulls/{}",
-        base_url, owner, repo, number
+        "{}/repos/{}/{}/pulls/{}",
+        api_endpoints(base_url).1,
+        owner,
+        repo,
+        number
     );
 
     let resp = client
@@ -285,6 +305,21 @@ pub async fn check_merged(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn endpoints_differ_between_github_com_and_enterprise() {
+        assert_eq!(
+            api_endpoints("https://github.com"),
+            ("https://api.github.com/graphql".into(), "https://api.github.com".into())
+        );
+        assert_eq!(
+            api_endpoints("https://github.sinequa.com/"),
+            (
+                "https://github.sinequa.com/api/graphql".into(),
+                "https://github.sinequa.com/api/v3".into()
+            )
+        );
+    }
 
     #[test]
     fn merge_state_maps_to_tri_state() {

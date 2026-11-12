@@ -36,6 +36,9 @@ pub struct Config {
     pub github_token: String,
     #[serde(default = "default_github_url")]
     pub github_url: String,
+    /// Token for github.com (fixed URL, no instance field).
+    #[serde(default)]
+    pub github_com_token: String,
     #[serde(default)]
     pub gitlab_token: String,
     #[serde(default = "default_gitlab_url")]
@@ -59,6 +62,7 @@ impl Default for Config {
         Config {
             github_token: String::new(),
             github_url: default_github_url(),
+            github_com_token: String::new(),
             gitlab_token: String::new(),
             gitlab_url: default_gitlab_url(),
             refresh_interval: default_refresh_interval(),

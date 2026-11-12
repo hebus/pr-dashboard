@@ -16,7 +16,7 @@ scripts/make_latest_json.py   builds the update manifest in CI
 
 | Module | Role |
 |---|---|
-| `providers/github.rs`, `gitlab.rs` | GraphQL queries and mapping to `PullRequest`. Author, reviewers and approvers carry `login` **and** display `name` (falls back to the login). |
+| `providers/github.rs`, `gitlab.rs` | GraphQL queries and mapping to `PullRequest`. Author, reviewers and approvers carry `login` **and** display `name` (falls back to the login). Three providers: `Github` (Enterprise Server, configurable URL, API under `{url}/api/graphql` and `/api/v3`), `GithubCom` (github.com, own token `githubComToken`, fixed URL, API on `api.github.com`; endpoints resolved by `github::api_endpoints`) and `Gitlab`. |
 | `providers/common.rs` | Shared output types (`PullRequest`, `Reviewer`, `RepoPRs`), HTTP client, label color normalization. |
 | `config.rs` | `Config` and its JSON file. Same file and shape as the Tauri build (`%APPDATA%/com.sinequa.prdashboard/config.json`, `{ "config": {...} }`) so an existing setup carries over. Every field has a `default`; never add `deny_unknown_fields` (a parse failure silently resets the user's tokens). |
 | `fetch.rs` | `fetch_repo_prs` / `check_pr_merged`. Failures are reported in `RepoPRs.error`, never as `Err`. |

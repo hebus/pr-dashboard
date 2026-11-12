@@ -227,7 +227,7 @@ impl AppView {
         let term = pr_term(repo.provider);
         let provider_icon = match repo.provider {
             Provider::Gitlab => "icons/gitlab.svg",
-            Provider::Github => "icons/github.svg",
+            Provider::Github | Provider::GithubCom => "icons/github.svg",
         };
 
         let toggle_id = repo.id.clone();
