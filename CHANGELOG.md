@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.12](https://github.com/hebus/pr-dashboard/compare/v0.1.11...v0.1.12) (2026-11-13)
+
+
+### Features
+
+* **card:** merge PR/MR from the app when mergeable ([dca4124](https://github.com/hebus/pr-dashboard/commit/dca41243747fb5d2029103e8eeb4531c5b1bbc44))
+* **card:** merge PR/MR from the app when mergeable ([395bf23](https://github.com/hebus/pr-dashboard/commit/395bf23a981d8f78db9f9feb5aefbc350bb4966d))
+
 ## [0.1.11](https://github.com/hebus/pr-dashboard/compare/v0.1.10...v0.1.11) (2026-11-12)
 
 
