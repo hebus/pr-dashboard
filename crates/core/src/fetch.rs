@@ -55,3 +55,23 @@ pub async fn check_pr_merged(
         Provider::Gitlab => gitlab::check_merged(&client, base, token, owner, repo, number).await,
     }
 }
+
+/// Merges a PR/MR with the repository's default method. Needs a write-capable token.
+pub async fn merge_pr(
+    provider: Provider,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    token: &str,
+    base_url: &str,
+) -> Result<(), String> {
+    if token.is_empty() {
+        return Err(format!("{} token not configured", provider.label()));
+    }
+    let client = make_client()?;
+    let base = base_url.trim_end_matches('/');
+    match provider {
+        Provider::Github | Provider::GithubCom => github::merge_pr(&client, base, token, owner, repo, number).await,
+        Provider::Gitlab => gitlab::merge_mr(&client, base, token, owner, repo, number).await,
+    }
+}

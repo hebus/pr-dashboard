@@ -302,9 +302,64 @@ pub async fn check_merged(
     Ok(pr.state == "closed" && pr.merged_at.is_some())
 }
 
+/// Merges a PR with the repository's default method (`merge`).
+pub async fn merge_pr(
+    client: &reqwest::Client,
+    base_url: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let resp = client
+        .put(merge_url(base_url, owner, repo, number))
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Accept", "application/vnd.github+json")
+        .json(&serde_json::json!({}))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(());
+    }
+    let msg = resp
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|v| v.get("message").and_then(|m| m.as_str().map(String::from)));
+    Err(match msg {
+        Some(m) => format!("HTTP {status}: {m}"),
+        None => format!("HTTP {status}"),
+    })
+}
+
+fn merge_url(base_url: &str, owner: &str, repo: &str, number: u64) -> String {
+    format!(
+        "{}/repos/{}/{}/pulls/{}/merge",
+        api_endpoints(base_url).1,
+        owner,
+        repo,
+        number
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merge_url_for_github_com_and_enterprise() {
+        assert_eq!(
+            merge_url("https://github.com", "o", "r", 7),
+            "https://api.github.com/repos/o/r/pulls/7/merge"
+        );
+        assert_eq!(
+            merge_url("https://github.sinequa.com/", "o", "r", 7),
+            "https://github.sinequa.com/api/v3/repos/o/r/pulls/7/merge"
+        );
+    }
 
     #[test]
     fn endpoints_differ_between_github_com_and_enterprise() {

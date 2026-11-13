@@ -81,7 +81,7 @@ On first launch, open **Settings** (gear icon, top right) and fill in:
 | Field | Description |
 |-------|-------------|
 | **GitHub URL / Token** | Your GitHub instance (default: `https://github.sinequa.com`) + a PAT with `repo` scope |
-| **GitLab URL / Token** | Your GitLab instance (default: `https://gitlab.chapsvision.in`) + a PAT with `read_api` scope |
+| **GitLab URL / Token** | Your GitLab instance (default: `https://gitlab.chapsvision.in`) + a PAT with `api` scope (`read_api` is enough to browse, but merging needs `api`) |
 | **Refresh interval** | Polling interval in seconds (default: 60, minimum 10) |
 | **Repositories** | One row per repo: a GitHub/GitLab switch, then `owner` / `repo` and an optional label |
 

@@ -19,18 +19,18 @@ scripts/make_latest_json.py   builds the update manifest in CI
 | `providers/github.rs`, `gitlab.rs` | GraphQL queries and mapping to `PullRequest`. Author, reviewers and approvers carry `login` **and** display `name` (falls back to the login). Three providers: `Github` (Enterprise Server, configurable URL, API under `{url}/api/graphql` and `/api/v3`), `GithubCom` (github.com, own token `githubComToken`, fixed URL, API on `api.github.com`; endpoints resolved by `github::api_endpoints`) and `Gitlab`. |
 | `providers/common.rs` | Shared output types (`PullRequest`, `Reviewer`, `RepoPRs`), HTTP client, label color normalization. |
 | `config.rs` | `Config` and its JSON file. Same file and shape as the Tauri build (`%APPDATA%/com.sinequa.prdashboard/config.json`, `{ "config": {...} }`) so an existing setup carries over. Every field has a `default`; never add `deny_unknown_fields` (a parse failure silently resets the user's tokens). |
-| `fetch.rs` | `fetch_repo_prs` / `check_pr_merged`. Failures are reported in `RepoPRs.error`, never as `Err`. |
-| `logic.rs` | Filters, search, branch ordering (develop, release/x by version desc, rest), relative time, avatar initials, the new/vanished PR diff, header totals, `generate_id`. |
+| `fetch.rs` | `fetch_repo_prs` / `check_pr_merged` / `merge_pr`. Failures are reported in `RepoPRs.error`, never as `Err`. |
+| `logic.rs` | Filters, search, branch ordering (develop, release/x by version desc, rest), relative time, avatar initials, the new/vanished PR diff, header totals, `can_merge` (button shown only if `mergeable == Some(true)`, not draft, no conflicts), `generate_id`. |
 
 ## `crates/app`
 
 | Module | Role |
 |---|---|
 | `main.rs` | Builds the tokio runtime, theme, assets, the `Dashboard` and `Updater` models and the window. |
-| `state.rs` | `Dashboard` model: config, per-repository data, notification history. One polling loop per repository (GPUI task + timer). Network calls run on a tokio runtime and are awaited from GPUI. Emits `PrEvent` for new / merged PRs. |
+| `state.rs` | `Dashboard` model: config, per-repository data, notification history. One polling loop per repository (GPUI task + timer). Network calls run on a tokio runtime and are awaited from GPUI. Emits `PrEvent` for new / merged PRs and `MergeFailed` when a card merge fails. `merge_pr` is the only write action: REST `PUT .../pulls/{n}/merge` (GitHub) or `PUT /api/v4/projects/{path}/merge_requests/{iid}/merge` (GitLab), default merge method of the repository. |
 | `view.rs` | Root view: header, update banner, filter bar, list, overlays. |
 | `repo_group.rs` | Flattens repositories into `Row`s for a **virtualized** `gpui::list` (only visible rows are built; rendering every card made scrolling crawl). `rows_dirty` marks when to rebuild. **The list is created with `measure_all()`**: an unmeasured row counts as 0 px, so by default the list only knows the height of what it has drawn, and the scrollbar thumb jumps while scrolling with the wheel (dragging it looks fine because GPUI freezes the height during a drag). `measure_all` only measures again after a `reset`, so a rebuild does `reset` then `scroll_to` the previous item to keep the position, and does nothing at all when the rows are unchanged (polling refreshes), to avoid re-measuring every row each time. |
-| `pr_card.rs`, `filter_bar.rs` | Card and filter bar. |
+| `pr_card.rs`, `filter_bar.rs` | Card and filter bar. The card's Merge button (state in `AppView.merge_ui`) needs a second click ("Confirm?", re-arms after 4 s). After a merge the repo is refetched; the "merged" toast comes from `confirm_merged`, not from the button. Merging needs a write token: GitHub `repo` (fine-grained: Pull requests write), GitLab `api`. |
 | `settings.rs` | Settings modal: edits a local copy, applied on Save. |
 | `notification_panel.rs`, `toasts.rs` | Notification history dropdown and transient toasts. |
 | `updater.rs`, `update_banner.rs` | Self-update (below). |

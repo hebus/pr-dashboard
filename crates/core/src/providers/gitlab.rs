@@ -208,6 +208,50 @@ pub async fn check_merged(
         .unwrap_or(false))
 }
 
+/// Accepts (merges) a merge request with the project's default settings.
+pub async fn merge_mr(
+    client: &reqwest::Client,
+    base_url: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let resp = client
+        .put(merge_url(base_url, owner, repo, number))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(());
+    }
+    let msg = resp
+        .json::<serde_json::Value>()
+        .await
+        .ok()
+        .and_then(|v| v.get("message").or_else(|| v.get("error")).map(|m| match m.as_str() {
+            Some(s) => s.to_string(),
+            None => m.to_string(),
+        }));
+    Err(match msg {
+        Some(m) => format!("HTTP {status}: {m}"),
+        None => format!("HTTP {status}"),
+    })
+}
+
+fn merge_url(base_url: &str, owner: &str, repo: &str, number: u64) -> String {
+    let project = format!("{owner}/{repo}").replace('/', "%2F");
+    format!(
+        "{}/api/v4/projects/{}/merge_requests/{}/merge",
+        base_url.trim_end_matches('/'),
+        project,
+        number
+    )
+}
+
 async fn post_graphql<T: serde::de::DeserializeOwned>(
     client: &reqwest::Client,
     base_url: &str,
@@ -342,6 +386,14 @@ mod tests {
     use super::*;
 
     const BASE: &str = "https://gitlab.chapsvision.in";
+
+    #[test]
+    fn merge_url_encodes_nested_namespace() {
+        assert_eq!(
+            merge_url("https://gitlab.chapsvision.in/", "sinequa/rnd", "app", 12),
+            "https://gitlab.chapsvision.in/api/v4/projects/sinequa%2Frnd%2Fapp/merge_requests/12/merge"
+        );
+    }
 
     fn mr_from(json: serde_json::Value) -> Option<PullRequest> {
         map_mr(BASE, serde_json::from_value::<GqlMr>(json).expect("fixture must parse"))
