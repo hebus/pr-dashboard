@@ -3,14 +3,18 @@
 use std::time::Duration;
 
 use gpui::{div, prelude::*, px, ClipboardItem, Context, FontWeight, IntoElement, SharedString};
-use pr_dashboard_core::logic::{pr_prefix, time_ago};
+use pr_dashboard_core::logic::{can_merge, pr_prefix, time_ago};
 use pr_dashboard_core::providers::common::{Provider, PullRequest};
 
 use crate::theme::Theme;
-use crate::view::AppView;
-use crate::widgets::{avatar_with_tooltip, badge, hex_with_alpha, icon, readable_label_color, MONO};
+use crate::view::{AppView, MergeUi};
+use crate::widgets::{
+    avatar_with_tooltip, badge, hex_with_alpha, icon, readable_label_color, text_button, MONO,
+};
 
 const COPIED_FEEDBACK: Duration = Duration::from_millis(1500);
+/// How long "Confirm?" stays armed before falling back to "Merge".
+const CONFIRM_WINDOW: Duration = Duration::from_millis(4000);
 
 fn review_badge(t: &Theme, decision: Option<&str>, is_draft: bool) -> impl IntoElement {
     if is_draft {
@@ -170,6 +174,58 @@ impl AppView {
                     .child(copy_button),
             );
 
+        let merge_button = can_merge(pr).then(|| {
+            let ui = self.merge_ui.get(&key).copied();
+            let label = match ui {
+                None => "Merge",
+                Some(MergeUi::Confirming) => "Confirm?",
+                Some(MergeUi::Merging) => "Merging...",
+            };
+            let (bg, hover) = if ui == Some(MergeUi::Confirming) {
+                (t.red, t.red)
+            } else {
+                (t.green_btn, t.green_btn_hover)
+            };
+            let (click_key, repo_id, merge_pr) = (key.clone(), repo_id.to_string(), pr.clone());
+            text_button(
+                SharedString::from(format!("merge-{key}")),
+                label,
+                Some("icons/git-merge.svg"),
+                gpui::rgb(0xffffff),
+                Some(bg),
+                hover,
+            )
+            .when(ui == Some(MergeUi::Merging), |e| e.opacity(0.4))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                // Do not also open the PR: the whole card is clickable.
+                cx.stop_propagation();
+                match this.merge_ui.get(&click_key).copied() {
+                    Some(MergeUi::Merging) => {}
+                    Some(MergeUi::Confirming) => {
+                        this.merge_ui.insert(click_key.clone(), MergeUi::Merging);
+                        cx.notify();
+                        let (repo_id, pr) = (repo_id.clone(), merge_pr.clone());
+                        this.dashboard.update(cx, |d, cx| d.merge_pr(&repo_id, &pr, cx));
+                    }
+                    None => {
+                        this.merge_ui.insert(click_key.clone(), MergeUi::Confirming);
+                        cx.notify();
+                        let expected = click_key.clone();
+                        cx.spawn(async move |this, cx| {
+                            cx.background_executor().timer(CONFIRM_WINDOW).await;
+                            let _ = this.update(cx, |this, cx| {
+                                if this.merge_ui.get(&expected) == Some(&MergeUi::Confirming) {
+                                    this.merge_ui.remove(&expected);
+                                    cx.notify();
+                                }
+                            });
+                        })
+                        .detach();
+                    }
+                }
+            }))
+        });
+
         let badges = div()
             .flex_none()
             .flex()
@@ -203,7 +259,8 @@ impl AppView {
                     Some("icons/circle-check.svg"),
                     "Mergeable",
                 ))
-            });
+            })
+            .children(merge_button);
 
         div()
             .id(SharedString::from(format!("pr-{key}")))

@@ -12,6 +12,7 @@ use pr_dashboard_core::logic::{
     diff_prs, has_token, missing_providers, provider_creds, snapshot, totals, EventKind, PrEvent,
     PrSnapshot, SnapshotMap, Totals,
 };
+use pr_dashboard_core::providers::common::PullRequest;
 use pr_dashboard_core::providers::common::repo_error;
 use pr_dashboard_core::providers::RepoPRs;
 
@@ -58,6 +59,16 @@ pub struct Dashboard {
 }
 
 impl EventEmitter<PrEvent> for Dashboard {}
+
+/// Raised when merging a PR/MR from its card failed (the view shows a toast).
+#[derive(Clone)]
+pub struct MergeFailed {
+    pub repo_id: String,
+    pub event: PrEvent,
+    pub error: String,
+}
+
+impl EventEmitter<MergeFailed> for Dashboard {}
 
 fn snapshot_key(repo: &RepositoryConfig) -> String {
     format!("{}:{}/{}", repo.provider.label(), repo.owner, repo.name)
@@ -220,6 +231,48 @@ impl Dashboard {
 
         self.repos.insert(repo.id.clone(), RepoState { data: Some(data), loading: false });
         cx.notify();
+    }
+
+    /// Merges a PR/MR from its card, then refetches the repo at once: on success
+    /// the PR vanishes and `confirm_merged` raises the "merged" event. On failure
+    /// a `MergeFailed` is emitted.
+    pub fn merge_pr(&mut self, repo_id: &str, pr: &PullRequest, cx: &mut Context<Self>) {
+        let Some(repo) = self.config.repositories.iter().find(|r| r.id == repo_id).cloned() else {
+            return;
+        };
+        let (token, base_url) = provider_creds(&self.config, &repo);
+        let (token, base_url) = (token.to_string(), base_url.to_string());
+        let runtime = cx.global::<TokioRuntime>().0.clone();
+        let (number, title, url) = (pr.number, pr.title.clone(), pr.url.clone());
+        let repo_id = repo_id.to_string();
+
+        cx.spawn(async move |this, cx| {
+            let (provider, owner, name) = (repo.provider, repo.owner.clone(), repo.name.clone());
+            let result = runtime
+                .spawn(async move {
+                    fetch::merge_pr(provider, &owner, &name, number, &token, &base_url).await
+                })
+                .await
+                .unwrap_or_else(|e| Err(e.to_string()));
+            let _ = this.update(cx, |d, cx| {
+                if let Err(error) = result {
+                    cx.emit(MergeFailed {
+                        repo_id: repo_id.clone(),
+                        event: PrEvent {
+                            kind: EventKind::Merged,
+                            provider: repo.provider,
+                            repo: format!("{}/{}", repo.owner, repo.name),
+                            pr_number: number,
+                            pr_title: title,
+                            url,
+                        },
+                        error,
+                    });
+                }
+                d.refresh_repo(&repo_id, cx);
+            });
+        })
+        .detach();
     }
 
     /// A vanished PR may have been merged or merely closed: only a merge raises

@@ -89,6 +89,11 @@ pub fn matches_filter(pr: &PullRequest, filter: FilterStatus) -> bool {
 
 /// Text search of the filter bar: title, author (login or display name) or PR
 /// number, case-insensitive. An empty query matches everything.
+/// The merge button is offered only when nothing blocks the merge.
+pub fn can_merge(pr: &PullRequest) -> bool {
+    pr.mergeable == Some(true) && !pr.is_draft && !pr.has_conflicts
+}
+
 pub fn matches_search(pr: &PullRequest, query: &str) -> bool {
     if query.is_empty() {
         return true;
@@ -406,6 +411,22 @@ mod tests {
             requested_reviewers: vec![],
             approvers: vec![],
         }
+    }
+
+    #[test]
+    fn can_merge_requires_clean_non_draft() {
+        let mut p = pr(1, None);
+        assert!(!can_merge(&p)); // unknown
+        p.mergeable = Some(true);
+        assert!(can_merge(&p));
+        p.is_draft = true;
+        assert!(!can_merge(&p));
+        p.is_draft = false;
+        p.has_conflicts = true;
+        assert!(!can_merge(&p));
+        p.has_conflicts = false;
+        p.mergeable = Some(false);
+        assert!(!can_merge(&p));
     }
 
     #[test]
